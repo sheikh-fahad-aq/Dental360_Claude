@@ -55,5 +55,5 @@ Check whether the SPA actually consumes this
 (`.claude/skills/main-architecture/references/api-contract-matrix.md`) — several backend
 surfaces have no frontend consumer, so "it works" may not be observable in the UI.
 
-Update the owning skill's Contract section with the new route, and commit backend-only
-(CLAUDE.md §8) — `/ship backend`.
+Update the owning skill's Contract section with the new route. Then run `/ship backend` to
+produce the commit message text — **do not commit it yourself** (CLAUDE.md §8).

@@ -68,5 +68,8 @@ surfaces have no frontend consumer at all.
 
 Report what changed, which route(s) it affects, whether the blueprint registration was
 needed, and what you ran to verify. If the change alters a contract or invariant, update
-the owning `be-*` skill in the same turn (CLAUDE.md §3). Never commit unless asked; if you
-do, backend and frontend go in **separate** commits (§8).
+the owning `be-*` skill in the same turn (CLAUDE.md §3).
+
+**Do not commit.** `360_Flask_Appointment` is committed by the user, by hand — do not run
+`git add` or `git commit` in it (CLAUDE.md §8). If the work is ready, hand over the commit
+message text via `/ship backend` instead.

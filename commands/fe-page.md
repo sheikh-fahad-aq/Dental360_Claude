@@ -58,5 +58,6 @@ of the 32 sections are in exactly that state, so it looks normal and nobody noti
 There is no test suite. `npm run lint`, then load the page in the preview and watch the
 request. Report what you actually saw — never claim a UI change works without looking.
 
-Then update the owning `fe-*` skill (new files, new route, changed recipe) and commit
-frontend-only — `/ship frontend`.
+Then update the owning `fe-*` skill (new files, new route, changed recipe) and run
+`/ship frontend` to produce the commit message text — **do not commit it yourself**
+(CLAUDE.md §8).

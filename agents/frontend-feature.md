@@ -78,4 +78,8 @@ to do that, and share what you saw. Never claim a UI change works without lookin
 
 Report what changed, which routes/components it affects, and what you actually observed.
 If the change alters a contract, invariant or file map, update the owning `fe-*` skill in
-the same turn (CLAUDE.md §3). Backend and frontend commit separately (§8).
+the same turn (CLAUDE.md §3).
+
+**Do not commit.** `PMS_React` is committed by the user, by hand — do not run `git add` or
+`git commit` in it (CLAUDE.md §8). If the work is ready, hand over the commit message text
+via `/ship frontend` instead.

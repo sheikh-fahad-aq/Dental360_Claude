@@ -145,7 +145,24 @@ client sent. Enforce it in the Flask route with a decorator from `app/util/decor
 
 ## §8 Committing
 
-One repo per commit. Backend and frontend changes ship as **separate** commits even when
-they implement one feature — name the counterpart in the commit body. `/ship` does this.
+**Never run `git commit` in `360_Flask_Appointment/` or `PMS_React/`.** Do not `git add`
+in them either. Those two repos are committed by the user, by hand.
 
-Never commit `.env`, `node_modules/`, `dist/`, `__pycache__/` or `env/`.
+What you owe instead is the **commit message text**, ready to paste — one message per repo,
+in a fenced block, plus the exact `git add` paths you would have staged. Then stop. `/ship`
+produces this.
+
+This holds even when the work is finished, verified and obviously correct, and even when
+the user asked you to "ship" or "finish" it. Producing the text *is* finishing it. Only an
+explicit, specific instruction to run the commit yourself overrides this.
+
+`.claude/` is the exception: it is tooling, not product, and you may commit it directly.
+
+Still true when you write the message:
+
+- One repo per commit — the three histories are independent and a commit never spans them.
+- Backend and frontend are **separate** messages even for one feature; name the counterpart
+  in each body.
+- Backend lands first when both changed; the two deploy independently.
+- Never stage `.env`, `node_modules/`, `dist/`, `__pycache__/` or `env/`.
+- Never `git push` anything, including `.claude/`.

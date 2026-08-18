@@ -1,66 +1,80 @@
 ---
-description: Stage and commit the current work as consolidated, per-repo commits
-argument-hint: "[backend | frontend | claude | all] [\"message\"]"
-allowed-tools: Bash, Read, Grep, Glob
+description: Produce ready-to-paste commit messages for the current work, one per repo
+argument-hint: "[backend | frontend | claude | all]"
+allowed-tools: Bash, Read, Grep, Glob, Task
 ---
 
-Commit the current work. **One repo per commit** — `360_Flask_Appointment`, `PMS_React` and
-`.claude` have three independent histories and a commit never spans them (CLAUDE.md §8).
+Prepare the current work for commit.
 
-## Survey before staging
+**You do not commit the application repos.** `360_Flask_Appointment` and `PMS_React` are
+committed by the user, by hand (CLAUDE.md §8). Your output is the commit message text and
+the staging command — not a commit. Do not run `git add` or `git commit` against either.
+
+`.claude/` is the exception and may be committed directly.
+
+## Survey
 
 ```bash
 cd "$CLAUDE_PROJECT_DIR" && for r in 360_Flask_Appointment PMS_React .claude; do echo "=== $r ($(git -C $r rev-parse --abbrev-ref HEAD 2>/dev/null)) ==="; git -C "$r" status --short; done
 ```
 
-`$ARGUMENTS` selects the scope: `backend`, `frontend`, `claude`, or `all` / empty for every
-repo that has changes. A quoted string is the subject line to use.
+`$ARGUMENTS` narrows the scope: `backend`, `frontend`, `claude`, or `all` / empty. Skip any
+repo that is clean and say so — do not invent work to describe.
 
-If a repo is clean, say so and skip it — do not create an empty commit.
+## Read the diff before writing anything
 
-## Before you stage anything
+`git -C <repo> diff` and `git -C <repo> diff --cached`, in full. A message describing
+changes you have not read is worse than no message.
 
-1. **Read the diff.** `git -C <repo> diff` — all of it. Never stage what you have not read.
-2. **Check for secrets and PHI.** No `.env`, no credential, no patient data, no token in
-   any hunk (CLAUDE.md §7.1, §7.2). If the diff touches auth, storage, logging or
-   rendering, run the `phi-security-reviewer` agent first.
-3. **Check for junk.** `node_modules/`, `dist/`, `__pycache__/`, `env/`, `.claude/skills/
-   main-architecture/.stale.json`, editor scratch files. If any is untracked-and-unwanted,
-   propose a `.gitignore` line rather than just skipping it.
-4. **Check the skills are current.** `python .claude/scripts/skill_status.py --stale`.
-   If a change alters a contract or invariant, the owning skill should be updated in the
-   *same* commit as the code — not a follow-up. Say so if you are deliberately deferring.
+While reading, check three things and report them **above** the message, not inside it:
 
-## Staging
+1. **Secrets and PHI.** No `.env`, credential, token, patient id or payload in any hunk
+   (CLAUDE.md §7.1, §7.2). If the diff touches auth, storage, logging or rendering, run the
+   `phi-security-reviewer` agent before going further.
+2. **Junk.** `node_modules/`, `dist/`, `__pycache__/`, `env/`, editor scratch. Propose a
+   `.gitignore` line rather than quietly omitting it from the staging command.
+3. **Stale skills.** `python .claude/scripts/skill_status.py --stale`. If the change alters
+   a contract or invariant, the owning skill should be updated and staged alongside the
+   code — flag it now, while it can still go in the same commit.
 
-Stage explicit paths. Never `git add -A` or `git add .` — both sweep up files nobody
-reviewed, and the app repos sit alongside a `.claude` tree that must not be mixed in.
+## Output, per repo
 
-## Message
+Give the staging command with **explicit paths**. Never `git add -A` or `git add .` — the
+two app repos sit next to a `.claude` tree that must not be swept in.
 
-Subject: imperative, under 72 chars, no type prefix — match the existing style, which is
-plain sentences (`git -C <repo> log --oneline -10` to confirm).
-
-Body: what changed and **why**, wrapped at 72. Then, when the work spans both apps, name
-the counterpart explicitly, because the two repos deploy independently and a reader of one
-history has no way to find the other:
-
-```
-Counterpart: PMS_React — <subject of the paired commit>
+```bash
+git -C 360_Flask_Appointment add app/appointments_v2_routes.py app/models.py
 ```
 
-End every commit message with:
+Then the message in its own fenced block, ready to paste:
 
-```
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+- Subject imperative, under 72 chars, no type prefix. Match the repo's existing style —
+  check with `git -C <repo> log --oneline -10`; both currently use plain sentences.
+- Body wrapped at 72, saying what changed and **why**.
+- When the work spans both apps, name the counterpart, because the repos deploy
+  independently and a reader of one history cannot find the other:
+
+  ```
+  Counterpart: PMS_React — <subject of the paired commit>
+  ```
+
+- End with:
+
+  ```
+  Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+  ```
+
+Then the commit command itself, unrun, so the user can paste it:
+
+```bash
+git -C 360_Flask_Appointment commit -F -
 ```
 
 ## Order
 
-When both apps changed, **commit the backend first** and say so. A frontend commit that
-assumes a new backend field is broken until the backend deploys.
+When both apps changed, present the **backend first** and say so explicitly. A frontend
+commit that assumes a new backend field is broken until the backend deploys.
 
-## Do not push
+## Finally
 
-Committing is local. Never `git push` — the user does that. Report each commit's repo,
-branch and short SHA when you are done, and state plainly anything you left uncommitted.
+State plainly what you did not cover and why. Do not push, and do not offer to.

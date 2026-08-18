@@ -54,6 +54,7 @@ Write and edit them against `docs/SKILL_AUTHORING_SPEC.md` — it is binding, an
 | Event | Script | What it does |
 |---|---|---|
 | `PreToolUse` on edits | `guard_paths.py` | Refuses writes to `.env`, applied Alembic revisions, lockfiles, `node_modules/`, `dist/`, and `PMS_React/public/`. Each refusal explains the alternative. |
+| `PreToolUse` on Bash | `guard_commits.py` | Refuses `git add` / `git commit` inside `360_Flask_Appointment` or `PMS_React` (CLAUDE.md §8) and points at `/ship`. Read-only git is untouched; `.claude/` is allowed. |
 | `PostToolUse` on edits | `record_change.py` | Appends the file to `skills/main-architecture/CHANGELOG.md` and marks the owning skill in `.stale.json`. |
 | `SessionStart` | `session_context.py` | Prints ~10 lines: each repo's branch, dirty state, and any stale skills. |
 
@@ -66,8 +67,11 @@ that.
 wins**, so specific globs must sit above general ones. It currently leaves zero files
 unclaimed; `python scripts/skill_status.py --coverage` verifies that.
 
-All three hooks are stdlib-only and exit 0 on any internal error — a broken hook must never
-block work.
+All four hooks are stdlib-only and exit 0 on any internal error — a broken hook must never
+block work. `guard_commits.py` exists because CLAUDE.md §8 hands the two application repos
+to the user to commit, and a rule that only lives in prose is forgotten at the end of a long
+task, which is exactly when it matters. A permission glob cannot express it: `Bash(git
+commit:*)` cannot tell which repo the command targets.
 
 ## Commands
 
@@ -80,7 +84,7 @@ block work.
 | `/fe-page` | Add a page, chart section, or settings section to convention |
 | `/mock-check` | What is real vs mock, so nothing fake gets demoed |
 | `/phi-check` | Review changes against the §7 security invariants |
-| `/ship` | Consolidated per-repo commits |
+| `/ship` | Ready-to-paste commit messages, one per repo (it does not commit) |
 
 ## Agents
 
