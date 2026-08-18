@@ -1,0 +1,177 @@
+# Dental360 file -> skill ownership map.
+# One rule per line: <glob><TAB><skill-name>
+# Matched in order against the workspace-relative POSIX path; FIRST MATCH WINS,
+# so specific patterns must appear above general ones.
+# Regenerate/validate with: /skill-sync --rebuild-map
+
+# ---------------------------------------------------------------- backend
+360_Flask_Appointment/app/appointments_v2_routes.py	be-appointments
+360_Flask_Appointment/app/appointment_routes.py	be-appointments
+360_Flask_Appointment/app/util/appointments_helpers.py	be-appointments
+360_Flask_Appointment/README_V2_APPOINTMENTS.md	be-appointments
+
+360_Flask_Appointment/app/appointment_checkin_routes.py	be-visit-lifecycle
+360_Flask_Appointment/app/appointment_checkout_routes.py	be-visit-lifecycle
+360_Flask_Appointment/app/appointment_tracking_routes.py	be-visit-lifecycle
+360_Flask_Appointment/app/appointment_status_routes.py	be-visit-lifecycle
+360_Flask_Appointment/app/appointment_notes_routes.py	be-visit-lifecycle
+360_Flask_Appointment/app/appointment_procedures_routes.py	be-visit-lifecycle
+360_Flask_Appointment/app/appointment_forms_routes.py	be-visit-lifecycle
+360_Flask_Appointment/Check_In_Flow.md	be-visit-lifecycle
+360_Flask_Appointment/Check_Out_Flow.md	be-visit-lifecycle
+
+360_Flask_Appointment/app/chart_perio_routes.py	be-perio
+360_Flask_Appointment/tests/test_chart_perio_*.py	be-perio
+
+360_Flask_Appointment/app/charting_routes.py	be-charting
+360_Flask_Appointment/app/chart_settings_routes.py	be-charting
+360_Flask_Appointment/app/chart_session_scheduler.py	be-charting
+360_Flask_Appointment/tests/*	be-charting
+
+360_Flask_Appointment/app/lab_cases_v2_routes.py	be-lab-cases
+360_Flask_Appointment/app/recare_v2_routes.py	be-recare-waitlist
+360_Flask_Appointment/app/waitlist_v2_routes.py	be-recare-waitlist
+360_Flask_Appointment/app/dashboard_routes.py	be-dashboard
+
+360_Flask_Appointment/app/models.py	be-data-model
+360_Flask_Appointment/migrations/*	be-data-model
+
+360_Flask_Appointment/*	be-platform
+
+# --------------------------------------------------------------- frontend
+# Data hooks are named by subject, not by folder, so they must be routed
+# explicitly and BEFORE the fe-patient-chart `usePatient*` catch-all below.
+PMS_React/src/hooks/useClaim*.js	fe-insurance-claims
+PMS_React/src/hooks/usePatientClaims.js	fe-insurance-claims
+PMS_React/src/hooks/usePatientInsuranceData.js	fe-insurance-claims
+PMS_React/src/hooks/usePatientLabCases.js	fe-labs
+PMS_React/src/hooks/useClinicLabCases.js	fe-labs
+PMS_React/src/hooks/usePatientForms.js	fe-forms
+PMS_React/src/hooks/useAppointmentDrag.js	fe-scheduling
+PMS_React/src/hooks/useCreateAppointment.js	fe-scheduling
+PMS_React/src/hooks/useExitWorkflow*.js	fe-scheduling
+PMS_React/src/hooks/usePatientAppointments.js	fe-scheduling
+PMS_React/src/hooks/useSettingsNavStatus.js	fe-settings
+PMS_React/src/hooks/usePatient*.js	fe-patient-chart
+PMS_React/src/hooks/useRelatedPeople.js	fe-patient-chart
+PMS_React/src/hooks/useRecentPatients.js	fe-patient-chart
+PMS_React/src/hooks/useFamilyNote.js	fe-patient-chart
+PMS_React/src/hooks/useMockLoad.js	fe-reports-worklists
+
+PMS_React/src/components/patient-detail/charting/perio/*	fe-perio
+PMS_React/src/components/patient-detail/charting/PerioChartPanel.jsx	fe-perio
+PMS_React/src/api/chartPerio.js	fe-perio
+
+PMS_React/src/components/patient-detail/charting/*	fe-charting
+PMS_React/src/api/charting.js	fe-charting
+PMS_React/src/api/chartingCatalog.js	fe-charting
+PMS_React/src/api/chartSettings.js	fe-charting
+PMS_React/src/context/ChartSettingsContext.jsx	fe-charting
+PMS_React/src/assets/odontogram/*	fe-charting
+
+PMS_React/src/components/ledger/*	fe-ledger
+PMS_React/src/pages/ledger/*	fe-ledger
+PMS_React/src/api/ledger.js	fe-ledger
+PMS_React/src/components/settings/ledger/*	fe-ledger
+
+PMS_React/src/components/patient-detail/insurance/*	fe-insurance-claims
+PMS_React/src/components/patient-detail/billing/*	fe-insurance-claims
+PMS_React/src/api/insurance.js	fe-insurance-claims
+PMS_React/src/api/claims.js	fe-insurance-claims
+PMS_React/src/api/payerPortals.js	fe-insurance-claims
+PMS_React/src/components/settings/payers/*	fe-insurance-claims
+PMS_React/src/utils/*laim*.js	fe-insurance-claims
+PMS_React/src/utils/insuranceMappers.js	fe-insurance-claims
+PMS_React/src/utils/eligibilityMappers.js	fe-insurance-claims
+PMS_React/src/utils/payerUtils.js	fe-insurance-claims
+
+PMS_React/src/components/scheduling/*	fe-scheduling
+PMS_React/src/context/SchedulingContext.jsx	fe-scheduling
+PMS_React/src/pages/Scheduling.jsx	fe-scheduling
+PMS_React/src/api/appointment*.js	fe-scheduling
+PMS_React/src/api/lookups.js	fe-scheduling
+PMS_React/src/api/schedule*.js	fe-scheduling
+PMS_React/src/api/rooms.js	fe-scheduling
+PMS_React/src/api/providers.js	fe-scheduling
+PMS_React/src/api/services.js	fe-scheduling
+PMS_React/src/api/multiCodes.js	fe-scheduling
+PMS_React/src/api/waitlist.js	fe-scheduling
+PMS_React/src/utils/appointment*.js	fe-scheduling
+PMS_React/src/utils/visitStatusTracker.js	fe-scheduling
+PMS_React/src/utils/weekRange.js	fe-scheduling
+PMS_React/src/utils/findOpenSlotsDrawerStore.js	fe-scheduling
+PMS_React/src/utils/schedulingQueueDrawerStore.js	fe-scheduling
+PMS_React/src/config/exitWorkflow*.js	fe-scheduling
+PMS_React/src/config/appointmentConfirmationStatuses.js	fe-scheduling
+# Grid geometry + the APPOINTMENTS seed; 28 importers, nearly all scheduling.
+# Must sit above `src/data/*` -> fe-reports-worklists.
+PMS_React/src/data/scheduling.js	fe-scheduling
+
+# Chart sections whose feature skill is not fe-patient-chart. These must stay
+# above the `patient-detail/*` catch-all below.
+PMS_React/src/components/patient-detail/labs/*	fe-labs
+PMS_React/src/components/patient-detail/forms/*	fe-forms
+
+PMS_React/src/components/patient-detail/*	fe-patient-chart
+PMS_React/src/pages/PatientDetail*.jsx	fe-patient-chart
+PMS_React/src/pages/PatientCharts*	fe-patient-chart
+PMS_React/src/config/patientSections.js	fe-patient-chart
+PMS_React/src/api/patients.js	fe-patient-chart
+PMS_React/src/context/PatientsContext.jsx	fe-patient-chart
+PMS_React/src/utils/patientMappers.js	fe-patient-chart
+PMS_React/src/utils/patientTableQuery.js	fe-patient-chart
+PMS_React/src/services/*	fe-patient-chart
+
+PMS_React/src/components/labs/*	fe-labs
+PMS_React/src/pages/Labs.jsx	fe-labs
+PMS_React/src/api/labs.js	fe-labs
+PMS_React/src/api/labCases.js	fe-labs
+PMS_React/src/components/settings/labs/*	fe-labs
+
+PMS_React/src/components/forms/*	fe-forms
+PMS_React/src/pages/Forms.jsx	fe-forms
+PMS_React/src/pages/PatientFormLinkPage.jsx	fe-forms
+PMS_React/src/api/forms.js	fe-forms
+# Catches patientFormLinkStore.js (the /f/ link store) AND patientForm.js, which
+# is the add/edit-patient demographics mapper, not intake. fe-forms documents it.
+PMS_React/src/utils/patientForm*.js	fe-forms
+PMS_React/src/components/settings/check-in-forms/*	fe-forms
+
+PMS_React/src/pages/Payments.jsx	fe-payments-fees
+PMS_React/src/pages/FeeSchedules.jsx	fe-payments-fees
+PMS_React/src/components/payments/*	fe-payments-fees
+PMS_React/src/components/fee-schedules/*	fe-payments-fees
+PMS_React/src/api/stripeTerminal.js	fe-payments-fees
+PMS_React/src/api/*FeeSchedule.js	fe-payments-fees
+PMS_React/src/utils/planFeeCsv.js	fe-payments-fees
+PMS_React/src/components/settings/payments/*	fe-payments-fees
+PMS_React/src/components/settings/fee-schedule/*	fe-payments-fees
+
+PMS_React/src/components/settings/*	fe-settings
+PMS_React/src/pages/Settings.jsx	fe-settings
+PMS_React/src/config/settingsNavigation.js	fe-settings
+PMS_React/src/api/procedureCodes.js	fe-settings
+
+PMS_React/src/components/auth/*	fe-auth
+PMS_React/src/pages/LoginPage.jsx	fe-auth
+PMS_React/src/pages/OtpPage.jsx	fe-auth
+PMS_React/src/pages/*Password*.jsx	fe-auth
+PMS_React/src/context/AuthContext.jsx	fe-auth
+PMS_React/src/api/auth.js	fe-auth
+PMS_React/src/config/authSlides.js	fe-auth
+
+PMS_React/src/pages/Lists.jsx	fe-reports-worklists
+PMS_React/src/pages/RevenueReports.jsx	fe-reports-worklists
+PMS_React/src/pages/Documents.jsx	fe-reports-worklists
+PMS_React/src/components/lists/*	fe-reports-worklists
+PMS_React/src/components/charts/*	fe-reports-worklists
+PMS_React/src/config/listsWorklists.js	fe-reports-worklists
+PMS_React/src/data/*	fe-reports-worklists
+PMS_React/scripts/*	fe-reports-worklists
+
+PMS_React/*	fe-platform
+
+# ------------------------------------------------------------ meta / tooling
+.claude/skills/*	main-architecture
+.claude/*	main-architecture
+CLAUDE.md	main-architecture

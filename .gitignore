@@ -1,0 +1,11 @@
+# Transient session state, not architecture.
+skills/main-architecture/.stale.json
+
+# Python noise
+__pycache__/
+*.pyc
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp

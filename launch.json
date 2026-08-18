@@ -3,8 +3,18 @@
   "configurations": [
     {
       "name": "pms-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "PMS_React",
       "url": "http://localhost:5173",
       "port": 5173
+    },
+    {
+      "name": "flask-api",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["run.py"],
+      "cwd": "360_Flask_Appointment",
+      "port": 5001
     }
   ]
 }
