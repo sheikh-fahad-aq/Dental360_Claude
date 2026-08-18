@@ -166,3 +166,20 @@ Still true when you write the message:
 - Backend lands first when both changed; the two deploy independently.
 - Never stage `.env`, `node_modules/`, `dist/`, `__pycache__/` or `env/`.
 - Never `git push` anything, including `.claude/`.
+
+## §9 Memory
+
+**Project memory lives in `.claude/memory/`, not in the per-user memory directory under
+`~/.claude/projects/`.** This overrides the default memory location. Anything worth
+remembering about Dental360 is written here, so it is versioned with the tooling, reviewable
+in a diff, and travels with the repo to every machine and teammate.
+
+- `.claude/memory/MEMORY.md` is the index — one line per memory, loaded every turn.
+- Each memory is its own file next to it, read only when the index says it is relevant.
+- Same format as before: `name` / `description` / `metadata.type` frontmatter, then the
+  fact. `[[wiki-links]]` between memories still resolve, by file name.
+- Before adding one, check whether an existing file already covers it and update that
+  instead. Do not record what the repo already states — a skill, `CLAUDE.md`, or git
+  history is the better home for anything derivable from the code.
+
+@.claude/memory/MEMORY.md

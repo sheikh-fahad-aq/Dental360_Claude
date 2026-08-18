@@ -1,0 +1,3 @@
+- [Workspace shape](dental360-workspace-shape.md) — three separate git repos, and most frontend API calls hit backends that aren't checked out here.
+- [.claude tooling](dental360-claude-tooling.md) — how the skills/hooks/commands are organised and how to keep them healthy.
+- [PMS_React README is the truth](pms-react-readme-is-truth.md) — trust the README's maturity labels; ignore PROJECT_GUIDE.md.

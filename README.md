@@ -13,6 +13,7 @@ neither app repo includes it (both `.gitignore` `.claude`).
 ├── hooks/               event scripts + the file→skill ownership map
 ├── scripts/             CLI helpers (not hooks)
 ├── skills/              main-architecture + one skill per feature
+├── memory/              project memory — MEMORY.md is the index
 └── docs/                authoring spec, glossary
 ```
 
@@ -90,6 +91,21 @@ commit:*)` cannot tell which repo the command targets.
 
 `backend-feature` · `frontend-feature` · `api-contract-auditor` · `phi-security-reviewer` ·
 `skill-curator`
+
+## Memory
+
+Project memory lives in `memory/`, **not** in the per-user directory under
+`~/.claude/projects/` that Claude Code uses by default. `CLAUDE.md` §9 states the override
+and imports `memory/MEMORY.md`, so the index (currently ~400 bytes) loads every turn and the
+individual files are read only when the index says one is relevant.
+
+Keeping it here means memory is versioned with the tooling, shows up in a diff, and travels
+to every machine and teammate — instead of living in one person's home directory where
+nobody else benefits from it and nobody can review it.
+
+One file per fact, `name` / `description` / `metadata.type` frontmatter, `[[wiki-links]]`
+between them resolving by file name. Update an existing file rather than adding a near
+duplicate, and do not record what a skill, `CLAUDE.md` or git history already says.
 
 ## Maintaining this
 
