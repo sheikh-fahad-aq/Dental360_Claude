@@ -14,7 +14,7 @@ sitting here; practice-wide defaults are edited in `components/settings/tooth-ch
 
 ## Files
 
-Paths under `PMS_React/`; `…/` = `src/components/patient-detail/charting/` — 38 code files + 2 spec docs + `perio/`, of which `PerioChartPanel.jsx` and all of `perio/` are **fe-perio**, leaving 37 owned here.
+Paths under `PMS_React/`; `…/` = `src/components/patient-detail/charting/` — 39 code files + 2 spec docs + `perio/`, of which `PerioChartPanel.jsx` and all of `perio/` are **fe-perio**, leaving 38 owned here.
 
 | Path | Role |
 |---|---|
@@ -23,12 +23,13 @@ Paths under `PMS_React/`; `…/` = `src/components/patient-detail/charting/` —
 | `…/ChartingHeaderControls.jsx` | Locked↔Active header — rendered by `patient-detail/PatientSectionHeader.jsx:97`, not by ChartingSection |
 | `…/ToothChartPanel.jsx` · `ToothChartContext.jsx` (45 KB) | the tooth-chart panel; per-tooth records, selection, all chart mutations |
 | `…/Odontogram.jsx` · `ToothGraphic.jsx` (45 KB) · `ToothNumberStrip.jsx` · `toothBuccalSvgs.js` | arch layout, per-tooth SVG + finding overlays, number rail, `import.meta.glob` of the tooth SVGs |
-| `…/AddChartingPopover.jsx` (22 KB) · `ToothDetailSidebar.jsx` · `SurfaceContextMenu.jsx` | charting entry UI |
+| `…/AddChartingPopover.jsx` (25 KB) · `ToothDetailSidebar.jsx` · `SurfaceContextMenu.jsx` | charting entry UI |
 | `…/ProcedureTable.jsx` · `ProcedureStatusMenu.jsx` · `EditProcedureModal.jsx` · `ChartStatusFilters.jsx` · `LayersDropdown.jsx` · `ChartLegend.jsx` · `ChartMaximizeModal.jsx` · `ChartingSubTabs.jsx` | ledger + row actions; filters/layers/legend/maximize/sub-tab chrome |
 | `…/ChartingAssistant.jsx` (42 KB) · `SignNoteDialog.jsx` · `UnlockChartModal.jsx` | note panel, signature dialog, unlock/resume queue |
 | `…/chartOwnership.js` | sessionStorage `chart_owned_session_<patientId>` accessors — the ownership rule |
 | `…/chartingConstants.js` · `chartingCatalog.js` · `chartProcedureMappers.js` · `chartVisuals.js` · `chartFindingGraphics.js` (64 KB) · `chartingNoteTemplates.js` | constants, catalogs, mappers, SVG geometry — inventory in references |
 | `…/useChartingConditionCatalog.js` · `useChartingProcedureCatalog.js` · `useClinicChartSettings.js` | live pick-lists + practice defaults, each dual-mode |
+| `…/chartingMultiCodes.js` | the Procedures tab's **Multi-codes section** — turns the catalog response's `multi_codes` into bundles with chart-ready `members` |
 | `…/ScreeningsPanel.jsx` · `CHARTING_API_FLOW.md` · `CHARTING_API_SPEC.md` | **placeholder** 14-line `EmptyState`; the backend contract — **cite, never duplicate** |
 | `src/api/charting.js` (45 KB) | the whole network contract + mocks. `grep -nE "^export "`, never read whole |
 | `src/api/chartingCatalog.js` · `chartSettings.js` · `src/context/ChartSettingsContext.jsx` | `/v2/charts/conditions`, `/v2/chart-settings`, practice settings provider (`src/App.jsx:69`) |
@@ -39,8 +40,9 @@ Paths under `PMS_React/`; `…/` = `src/components/patient-detail/charting/` —
 Renders at `ROUTES.patientCharting(patientId)` → `/patients/:patientId/charting`
 (`src/config/routes.js:32`), section id `charting` in `src/config/patientSections.js:23`. Calls
 `src/api/charting.js` (17 functions on `chartApi`, base `/v2/charts`), `chartingCatalog.js`,
-`chartSettings.js`, and via `useChartingProcedureCatalog` `src/api/procedureCodes.js` — endpoint
-table in `references/wire-and-state.md` §1. Exposes `useCharting()` / `useToothChart()`; consumes
+`chartSettings.js`, and via `useChartingProcedureCatalog` `src/api/procedureCodes.js`
+(`authApi`), whose response carries the multi-codes too — endpoint table in
+`references/wire-and-state.md` §1. Exposes `useCharting()` / `useToothChart()`; consumes
 `useChartSettingsOptional()`.
 
 ## Invariants
@@ -55,26 +57,34 @@ table in `references/wire-and-state.md` §1. Exposes `useCharting()` / `useTooth
 4. **`entryType` ≠ `procedureStatus`.** `entryType` = `TP|Cn|EC|EO` (kind of entry);
    `procedureStatus` = `P|C|D|R`. Never map one onto the other. Transitions are one-way and
    one-time: only `P` may move, and `C`/`D`/`R` are terminal.
-5. **Signer identity is server-side** (CLAUDE.md §7.7). `providerId`/`providerName` in the sign
+5. **A multi-code is never charted as itself.** Charting the bundle row writes one $0 ledger
+   line for work nobody performed. Bundles live in their own **Multi-codes section** of the
+   Procedures tab, fed by the `multi_codes` array that `GET /v2/procedure-codes` already
+   returns beside `procedure_codes` — members included, so there is **no second request and no
+   multi-codes endpoint in the charting path**. A click charts those members through
+   `addProcedures`, in one batch. What the section lists is exactly what the click charts:
+   the same objects. Identify a bundle by `item_type === 'multi'`, never by category — the
+   live ones sit under Orthodontics and Diagnostic, not "Multi-codes".
+6. **Signer identity is server-side** (CLAUDE.md §7.7). `providerId`/`providerName` in the sign
    payload are convenience only; there is no client-side role gating anywhere in this app.
-6. **Never render `autoSaveDraft` or any server HTML as markup** (CLAUDE.md §7.4) — carry it as an
+7. **Never render `autoSaveDraft` or any server HTML as markup** (CLAUDE.md §7.4) — carry it as an
    opaque string. `ToothGraphic.jsx:961` is the sole `dangerouslySetInnerHTML` and it renders
    bundled local SVG, never network data.
-7. **Never log a chart payload, URL or patient id** (CLAUDE.md §7.1) — all PHI. Catch blocks
+8. **Never log a chart payload, URL or patient id** (CLAUDE.md §7.1) — all PHI. Catch blocks
    re-throw via `toChartSessionError`; surface text with `getErrorMessage(err, fallback)`.
-8. **Dual-mode by env-var presence** (CLAUDE.md §5): `isChartApiEnabled()` is only "is `VITE_APP_BASE_URL_CHART` non-empty" — unset it and charting silently serves mocks.
+9. **Dual-mode by env-var presence** (CLAUDE.md §5): `isChartApiEnabled()` is only "is `VITE_APP_BASE_URL_CHART` non-empty" — unset it and charting silently serves mocks.
    Every new API function needs an `if (!isChartApiEnabled())` branch and a `normalizeX(raw)` mapper.
-9. **`fetch()` never appears here.** Import from `src/api/`; `chartApi` always emits the
+10. **`fetch()` never appears here.** Import from `src/api/`; `chartApi` always emits the
    same-origin `/__chart_api/api` prefix (the host refuses browser CORS) and the proxy is declared
    twice — `vite.config.js` and `vercel.json` — keep both in sync.
-10. **Chart data loads once, in ChartingContext**: procedures, then `/active`, then the session
+11. **Chart data loads once, in ChartingContext**: procedures, then `/active`, then the session
     list (`ChartingContext.jsx:171-215`). Do not add a second fetch in ToothChartProvider.
-11. **No hardcoded hexes in components** — Tailwind utilities over `src/theme/theme.css` vars. The
+12. **No hardcoded hexes in components** — Tailwind utilities over `src/theme/theme.css` vars. The
     hexes in `chartVisuals.js` / `chartFindingGraphics.js` are SVG paint constants; leave them there.
-12. **Overlays** = `createPortal` + `AnimatePresence` + `OverlayBackdrop` with a named
+13. **Overlays** = `createPortal` + `AnimatePresence` + `OverlayBackdrop` with a named
     `OVERLAY_Z_INDEX` key (`ChartMaximizeModal.jsx:36`, `UnlockChartModal.jsx:100`), never `z-[n]`.
     Feedback is `const { toast } = useToast()` — never `alert`.
-13. **Tooth numbers are integers 1-32**; primary/mixed is unsupported and fails loudly (Traps).
+14. **Tooth numbers are integers 1-32**; primary/mixed is unsupported and fails loudly (Traps).
     ISO `YYYY-MM-DD` on the wire; there is no date library in this repo.
 
 ## Working here
@@ -85,6 +95,9 @@ table in `references/wire-and-state.md` §1. Exposes `useCharting()` / `useTooth
    `normalizeX`), then document it in `CHARTING_API_SPEC.md`.
 3. **New chart mutation** → `ToothChartContext.jsx` (optimistic update + server call + rollback),
    then `AddChartingPopover.jsx` / `ToothDetailSidebar.jsx`, then `ProcedureTable.jsx` for its row.
+   Anything charting more than one row at once goes through `addProcedures` (one `patchTooth`,
+   one `persistEntry` per row) — looping `addProcedure` reads a `chartRef` that only catches up
+   after a render, so its duplicate check silently misfires mid-batch.
 4. **New visual/finding** → glyph in `chartVisuals.js`, geometry in `chartFindingGraphics.js`,
    catalog row in `chartingCatalog.js`, **and** a `CHART_LAYERS` entry — the forgotten step.
 5. **New sub-tab** → `CHARTING_SUB_TABS` (`chartingConstants.js:16`) **and** the `PANELS` map

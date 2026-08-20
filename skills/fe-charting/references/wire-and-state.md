@@ -42,6 +42,44 @@ Sibling modules: `PMS_React/src/api/chartingCatalog.js` → `GET /v2/charts/cond
 `PMS_React/src/api/chartSettings.js` → `GET/PUT /v2/chart-settings` (gated by
 `isChartApiEnabled`, re-exported as `isChartSettingsApiEnabled`).
 
+**Not on `chartApi`** — the Procedures tab's pick-list rides the AUTH backend:
+`src/api/procedureCodes.js` → `GET /v2/procedure-codes`, gated by `isAuthApiEnabled`.
+
+**That one call also carries the bundles.** The response has `multi_codes` as its own array
+beside `procedure_codes`, each bundle already holding the member procedures it stands for:
+
+```json
+{ "procedure_codes": [ { "code": "D2161", "item_type": "procedure", … } ],
+  "multi_codes":     [ { "code": "DEVADCOEPV", "name": "Adult COE PVT", "item_type": "multi",
+                         "procedure_count": 2, "procedure_codes_csv": "D0012, DEV000",
+                         "procedures": [ { "procedure_code": "D0012",
+                                           "procedure_name": "Gum Builder", "fee": 0, … } ] } ],
+  "multi_codes_total": 2 }
+```
+
+So charting makes **no** multi-codes request: `listProcedureCodes` returns `multiCodes` (run
+through `normalizeMultiCode`, reused from `src/api/multiCodes.js`) next to `items`, and
+`useChartingProcedureCatalog` returns them as `multiCodes` for the picker's section. The same
+response fills the section and supplies what gets charted, so the list cannot promise one
+procedure and chart another. `previewMultiCode` / `listMultiCodes` still exist for
+Settings › Multi-Codes; charting calls neither.
+
+Three traps live in that shape:
+
+1. **Bundles are not paged with the codes.** `total` / `total_pages` describe `procedure_codes`
+   alone and the same bundles repeat on **every** page, so the paging loop gathers them into a
+   `Map` by id — appending would yield one copy per page.
+2. **Category does not identify a bundle.** The live ones are filed under Orthodontics (15) and
+   Diagnostic (6), *not* "Multi-codes" (18). `isMultiCodeRow` tests `item_type === 'multi'`
+   first and only falls back to the category when the field is absent — otherwise every
+   ordinary Orthodontics code would be swallowed as a bundle.
+3. **A member fee of 0 is a real answer** (several codes here are genuinely 0), so the catalog
+   price book is consulted only when the bundle gave no number at all — it exists for the thin
+   `procedure_codes_csv`-only response, where names and fees are backfilled by code.
+
+Archived bundles (`is_active === false`) are dropped client-side. With the auth API off there
+is no mock bundle catalog and none is invented — the section simply does not appear.
+
 ## 2. `createChartProcedure` payload (charting.js:752-795)
 
 Wire keys differ from UI keys: `code → cdtCode`, `label → description`, `fee → ucrFeeCents`
@@ -95,6 +133,7 @@ rather than blocking the page. Guarded by a `cancelled` flag, not a request-id r
 | `chartFindingGraphics.js` | 1377 | pure SVG geometry for findings (caries dots, fracture polylines, root position). Biggest file in the slice; `grep` it |
 | `chartingNoteTemplates.js` | 425 | bundled note templates, `cloneTemplate`, `makeBlankTemplate` |
 | `chartOwnership.js` | 73 | the four sessionStorage accessors + `ownedSessionKey` |
+| `chartingMultiCodes.js` | 125 | pure helpers, no hooks/network: `MULTI_CODE_CATEGORY_ID` (18), `isMultiCodeRow`, `buildPriceBook`, `toChartingMultiCode(raw, priceBook)` → bundle + `members` (chart-ready) + `memberCount`. Fetched by `useChartingProcedureCatalog`, which returns `multiCodes` |
 
 ## 6. Dentition
 

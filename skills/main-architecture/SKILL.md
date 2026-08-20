@@ -40,6 +40,7 @@ Which frontend module calls which backend blueprint: `references/api-contract-ma
 | `be-perio` | Periodontal exams — measurement grid, lifecycle, bulk entry |
 | `be-lab-cases` | Lab case lifecycle, vendors, due dates |
 | `be-recare-waitlist` | Recare/recall due tracking and the ASAP waitlist |
+| `be-treatment-plans` | Phase-wise treatment plans: patient accept/decline, signature, share link, and the bridge from accepted work to a booked visit |
 | `be-dashboard` | Aggregate statistics and reporting endpoints |
 | `be-data-model` | `models.py` and Alembic migrations — the model index every other skill defers to |
 | `be-platform` | `create_app()` wiring, config, auth decorators, uploads, Docker, CI |

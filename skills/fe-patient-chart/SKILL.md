@@ -20,7 +20,7 @@ only embeds scheduling. Maturity is **mixed** — read `references/sections.md` 
 | `src/config/patientSections.js` | 178 lines. `PATIENT_SECTIONS` (the tab registry), `getPatientSectionById`, `getActivePatientSectionId`, `getPatientSectionTitle`. |
 | `src/pages/PatientCharts.jsx` · `PatientDetail.legacy.jsx` | 804 / 887 lines, 31KB each — `grep`/`sed`, never read whole. The first is the patient list at `/patients` **and** `/`; the second is **dead**, imported nowhere in `src/`. Do not edit or copy from the legacy file. |
 | `src/components/patient-detail/` shell | `PatientChartSidebar.jsx` 529 · `PatientAlertsPanel.jsx` 379 · `PatientSectionHeader.jsx` 122 · `PatientSectionPlaceholder.jsx` 18 · `PatientDetailSkeleton.jsx` 207 (dead, see Traps) · `shared/patientSectionUi.jsx` 88 · `shared/SimpleFormDialog.jsx` 119. |
-| `src/components/patient-detail/<section>/` | Owned: `appts` 2 files · `audit` 2 · `comms` 1 · `contact` 1 · `docs` 4 · `family` 3 · `images` 1 · `journal` 2 · `medical-hx` 12 · `notes` 5 (TipTap) · `schedule` 1 · `tx-plans` 4. **Not owned, sitting in this tree:** `charting/` + `charting/perio/` (fe-charting / fe-perio), `insurance/` 9 + `billing/` 6 (fe-insurance-claims), `forms/` 4 (fe-forms), `labs/` 2 (fe-labs). Largest owned: `appts/AddAppointmentDrawer.jsx` 1334, `docs/DocsSection.jsx` 994. |
+| `src/components/patient-detail/<section>/` | Owned: `appts` 2 files · `audit` 2 · `comms` 1 · `contact` 1 · `docs` 4 · `family` 3 · `images` 1 · `journal` 2 · `medical-hx` 12 · `notes` 5 (TipTap) · `schedule` 1 · `tx-plans` 4 (`TxPlansSection`, two drawers, `txPlanFormat.js`; backed by `src/api/treatmentPlans.js` + `hooks/usePatientTreatmentPlans.js`). **Not owned, sitting in this tree:** `charting/` + `charting/perio/` (fe-charting / fe-perio), `insurance/` 9 + `billing/` 6 (fe-insurance-claims), `forms/` 4 (fe-forms), `labs/` 2 (fe-labs). Largest owned: `appts/AddAppointmentDrawer.jsx` 1334, `docs/DocsSection.jsx` 994. |
 | `src/api/patients.js` | 327 lines. The only patient wire module; `authApi` + a local `unwrap()` at `:8`; re-exports the forms endpoints from `./forms` at `:306`. Hooks reach it via `src/services/patientApiService.js` (203). |
 | `src/utils/patientMappers.js` · `patientTableQuery.js` · `src/context/PatientsContext.jsx` | 252 / 132 / 68. `mapApiPatientToView`; the pure list search/filter/sort; an in-memory patient list seeded from `src/data/patients.js` — no persistence, no network. |
 | `src/hooks/usePatient*.js` · `useRelatedPeople.js` · `useRecentPatients.js` · `useFamilyNote.js` | **14** hooks owned here; return shapes in `references/sections.md` §2. Five `usePatient*` hooks are **not** owned: `usePatientAppointments` (fe-scheduling), `usePatientClaims` + `usePatientInsuranceData` (fe-insurance-claims), `usePatientLabCases` (fe-labs), `usePatientForms` (fe-forms). |
@@ -40,9 +40,10 @@ mutations do **not** (`PUT/DELETE /v2/patient-<plural>/:itemId`). Routes: `refer
 `PATIENT_SECTIONS` entry, read off the tree, not copied from the README. Read it before calling any
 tab real. Summary: `charting` `overview` `family` `insurance` `appts` `notes` `labs` `medical-hx`
 `forms` `history` `schedule` are **live**; `billing` is claims-live + ledger-live; `docs` is **mock**
-except lab cases; `journal` is **partial** (read-only, no write API); `tx-plans` is **mock**
-("Generate from Chart" reads fabricated findings, never the chart); `images` and `comms` are
-**stubs**. Two corrections against `PMS_React/README.md:233-249`: Post-Op is **commented out**
+except lab cases; `journal` is **partial** (read-only, no write API); `tx-plans` is **partial** —
+the list, create and "Generate from Chart" are now live against
+`/v2/treatment-plans` (`be-treatment-plans`), but the full-screen builder, Present/Send and
+the patient review page are not built yet; `images` and `comms` are **stubs**. Two corrections against `PMS_React/README.md:233-249`: Post-Op is **commented out**
 (`patientSections.js:81-87`), so **17** render not 18; and its "ledger mock" is stale —
 `billing/BillingSection.jsx:11` imports the real `ledger/LedgerWorkspace` (`README.md:17-19`, `:299`).
 

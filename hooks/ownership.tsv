@@ -31,6 +31,9 @@
 360_Flask_Appointment/app/lab_cases_v2_routes.py	be-lab-cases
 360_Flask_Appointment/app/recare_v2_routes.py	be-recare-waitlist
 360_Flask_Appointment/app/waitlist_v2_routes.py	be-recare-waitlist
+
+360_Flask_Appointment/app/treatment_plans_v2_routes.py	be-treatment-plans
+360_Flask_Appointment/tests/test_treatment_plans.py	be-treatment-plans
 360_Flask_Appointment/app/dashboard_routes.py	be-dashboard
 
 360_Flask_Appointment/app/models.py	be-data-model
@@ -51,6 +54,7 @@ PMS_React/src/hooks/useAppointmentDrag.js	fe-scheduling
 PMS_React/src/hooks/useCreateAppointment.js	fe-scheduling
 PMS_React/src/hooks/useExitWorkflow*.js	fe-scheduling
 PMS_React/src/hooks/usePatientAppointments.js	fe-scheduling
+PMS_React/src/hooks/usePatientTreatmentPlans.js	fe-patient-chart
 PMS_React/src/hooks/useSettingsNavStatus.js	fe-settings
 PMS_React/src/hooks/usePatient*.js	fe-patient-chart
 PMS_React/src/hooks/useRelatedPeople.js	fe-patient-chart
@@ -63,6 +67,7 @@ PMS_React/src/components/patient-detail/charting/PerioChartPanel.jsx	fe-perio
 PMS_React/src/api/chartPerio.js	fe-perio
 
 PMS_React/src/components/patient-detail/charting/*	fe-charting
+PMS_React/src/api/treatmentPlans.js	fe-patient-chart
 PMS_React/src/api/charting.js	fe-charting
 PMS_React/src/api/chartingCatalog.js	fe-charting
 PMS_React/src/api/chartSettings.js	fe-charting
