@@ -18,7 +18,7 @@ One row per entry in `src/config/patientSections.js`. "Page export" is the named
 | `insurance` | `insurance` | `PatientInsurancePage` | `patient-detail/insurance/` | `usePatientInsuranceData` | live — **fe-insurance-claims** |
 | `appts` | `appts` | `PatientApptsPage` | `appts/` (2 files) | `usePatientAppointments` | live |
 | `billing` | `billing` | `PatientBillingPage` | `patient-detail/billing/` | `usePatientClaims` + `ledger/LedgerWorkspace` | claims live, ledger live — **fe-insurance-claims / fe-ledger** |
-| `tx-plans` | `tx-plans` | `PatientTxPlansPage` | `tx-plans/` (4 files) | local `useState([])` + `txPlanMockFindings.js` | **mock** |
+| `tx-plans` | `tx-plans` | `PatientTxPlansPage` | `tx-plans/` (7 files + `builder/` 12) | `usePatientTreatmentPlans` + `usePatientChartFindings` -> `/v2/treatment-plans`, `/v2/charts/chartprocedure` | **partial** (live list/create/builder; no Present/Send) |
 | `notes` | `notes` | `PatientNotesPage` | `notes/` (5 files) | `usePatientNotes` | live |
 | `images` | `images` | `PatientImagesPage` | `images/ImagesSection.jsx` | none | **stub** |
 | `labs` | `labs` | `PatientLabsPage` | `labs/` (2 files) | `usePatientLabCases` | live |
@@ -40,7 +40,9 @@ falls through the catch-all route to `PatientSectionPlaceholderPage`.
   No API import anywhere in the file.
 - `images/ImagesSection.jsx:42-52` — the file picker and both action buttons only `toast(...)`
   ("Imaging upload API is not available yet."). 105 lines total.
-- `tx-plans/TxPlansSection.jsx:31` — `const [plans, setPlans] = useState([])`; nothing persists.
+- `tx-plans/` is no longer mock: `TxPlansSection.jsx` reads `usePatientTreatmentPlans`
+  (plans) and `usePatientChartFindings` (charted treatment not yet on a plan). Both refuse
+  to fall back to seeds — a fabricated treatment plan is a financial document.
   `tx-plans/GenerateFromChartDrawer.jsx:17-18,223,245,272` reads `MOCK_CURRENT_VISIT_FINDINGS` /
   `ALL_MOCK_FINDINGS` from `txPlanMockFindings.js`. **It never touches the odontogram.**
 - `docs/DocsSection.jsx:489` — the only real documents are `labCaseToDoc(...)` rows built from

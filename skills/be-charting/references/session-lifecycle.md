@@ -46,6 +46,7 @@ which only works while the session is still `active` or `draft`.
 | `POST /chartprocedure` `:522` | any mode | **`active` only** (`:569`) | unchanged (touched) |
 | `DELETE /chartprocedure` `:674` | any mode | **`active` only** (`:700`) | unchanged (touched) |
 | `POST /chartprocedure/status` `:761` | any mode | **`active` only** (`:797`) | unchanged (touched) |
+| `POST /chartprocedure/details` `:1745` | any mode | **none — any status** (`:1745` docstring) | unchanged (touched) |
 
 Read routes (`GET /chart-session`, `/chart-session/active`, `/chart-session/templates`,
 `/chartprocedure`, `/conditions`, `/chart-templates`) gate on nothing but auth.
@@ -79,7 +80,10 @@ provider_id, action, details)`. Actions actually emitted:
 `session_created`, `session_resumed`, `session_signed`, `session_auto_signed`,
 `session_auto_drafted` (scheduler only, `user_id="system"`), `draft_saved` (manual saves only —
 autosaves write no audit row, `:1364`), `chart_template_updated`, `chart_session_note_saved`,
-`procedure_added` / `procedure_updated` / `procedure_deleted` / `procedure_status_updated`,
+`procedure_added` / `procedure_updated` / `procedure_deleted` / `procedure_status_updated` /
+`procedure_details_updated` (the administrative-correction route; its `details` string names each
+changed field `old -> new`, but for `comments` records only *that* it changed — the note body is
+clinical free text, CLAUDE.md §7.1),
 `condition_added` / `condition_updated` (the non-`TP` twins of the procedure actions).
 
 `chart_id` on the audit row is the **zero-padded string** `_chart_code:268`, not `Chart.id`.

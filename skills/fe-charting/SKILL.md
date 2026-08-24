@@ -39,7 +39,7 @@ Paths under `PMS_React/`; `…/` = `src/components/patient-detail/charting/` —
 
 Renders at `ROUTES.patientCharting(patientId)` → `/patients/:patientId/charting`
 (`src/config/routes.js:32`), section id `charting` in `src/config/patientSections.js:23`. Calls
-`src/api/charting.js` (17 functions on `chartApi`, base `/v2/charts`), `chartingCatalog.js`,
+`src/api/charting.js` (18 functions on `chartApi`, base `/v2/charts`), `chartingCatalog.js`,
 `chartSettings.js`, and via `useChartingProcedureCatalog` `src/api/procedureCodes.js`
 (`authApi`), whose response carries the multi-codes too — endpoint table in
 `references/wire-and-state.md` §1. Exposes `useCharting()` / `useToothChart()`; consumes

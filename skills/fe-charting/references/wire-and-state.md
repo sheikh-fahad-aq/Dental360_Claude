@@ -25,6 +25,7 @@ Read those before changing a payload. This file is the index into them.
 | `fetchChartProcedures` (903) | `GET  /v2/charts/chartprocedure` |
 | `deleteChartProcedure` (934) | `DELETE /v2/charts/chartprocedure` (body `{sessionId, objectId}`) |
 | `updateChartProcedureStatus` (979) | `POST /v2/charts/chartprocedure/status` |
+| `updateChartProcedureDetails` (1005) | `POST /v2/charts/chartprocedure/details` — fee/provider/date/comments, partial by KEY PRESENCE; the ONLY chart-procedure write with **no active-session gate**, and it rejects `cdtCode`/`type`/`toothNumber`/ids/`status` with 400 |
 | `fetchChartTemplates` (821) | `GET  /v2/charts/chart-templates` |
 | `fetchChartSessionTemplates` (859) | `GET  /v2/charts/chart-session/templates` (plural — different path) |
 | `applyChartSessionTemplate` (881) | `POST /v2/charts/chart-session/template` (singular) |

@@ -15,10 +15,10 @@ created, never opening or closing one. Maturity **live** (`PMS_React/README.md:2
 
 | path | role |
 |---|---|
-| `360_Flask_Appointment/app/charting_routes.py` | **(entry)** blueprint `charting_routes`; 16 routes, validators, serializers, audit log. ~57KB / 1671 lines — `grep -nE "@charting_routes.route"` then `sed -n`, never read whole. Constants `:26`-`:62` are the authoritative enums. |
+| `360_Flask_Appointment/app/charting_routes.py` | **(entry)** blueprint `charting_routes`; 17 routes, validators, serializers, audit log. ~65KB / 1879 lines — `grep -nE "@charting_routes.route"` then `sed -n`, never read whole. Constants `:26`-`:62` are the authoritative enums. |
 | `360_Flask_Appointment/app/chart_settings_routes.py` | blueprint `chart_settings_routes`; GET/PUT `/v2/chart-settings`. 241 lines, read whole — its comments are the tenancy record. |
 | `360_Flask_Appointment/app/chart_session_scheduler.py` | 139 lines. Flask-APScheduler job `chart_session_auto_draft`. Wiring for all three lives in `be-platform`'s `__init__.py` at `:50,67` · `:51,68` · `:74` (`init_scheduler(app)`) — the easy thing to forget. |
-| `360_Flask_Appointment/tests/` | `test_charting_sessions.py` (1117), `test_chart_procedures.py` (440), `test_chart_session_notes.py` (311), `test_conditions_catalog.py` (231), `test_chart_session_scheduler.py` (151), `test_charting_rules.py` (88). |
+| `360_Flask_Appointment/tests/` | `test_charting_sessions.py` (1117), `test_chart_procedures.py` (736), `test_chart_session_notes.py` (311), `test_conditions_catalog.py` (231), `test_chart_session_scheduler.py` (151), `test_charting_rules.py` (88). |
 
 Touches, not owned: `app/models.py:551-880` (the eight `Chart*` models) and the revisions that
 create them — both `be-data-model`'s, since `ownership.tsv` gives it every file under
@@ -27,7 +27,7 @@ create them — both `be-data-model`'s, since `ownership.tsv` gives it every fil
 
 ## Contract
 
-All 18 routes carry `@require_api_and_bearer` (`app/util/decorators.py:206`) — `x-api-key` plus a
+All 19 routes carry `@require_api_and_bearer` (`app/util/decorators.py:206`) — `x-api-key` plus a
 Bearer validated by a live HTTP call to Auth — and mount at `/api`. Under `/api/v2/charts`:
 
 - `POST /chart-session` `:1206` open one, 409 + the existing session if any is open ·
@@ -38,6 +38,11 @@ Bearer validated by a live HTTP call to Auth — and mount at `/api`. Under `/ap
   active session · `/templates` `:1103` this session's notes
 - `POST /chartprocedure` `:522` add one entry, **upsert/merge not insert** · `DELETE` `:674`
   soft-delete, planned `TP` only · `POST /chartprocedure/status` `:761` `P`/`R`/`C`/`D`
+- `POST /chartprocedure/details` `:1745` edit the **administrative** fields only —
+  `ucrFeeCents`, `providerId`+`providerName`, `chartDate`, `comments`, each applied only if its
+  key is present; 400 on any identity field (`cdtCode`, `type`, `toothNumber`, `patientId`,
+  `sessionId`, `clinicId`, `locationId`, `status`, `objectId`). **The one write that is NOT
+  session-gated** — see Invariant 2
 - `GET /chartprocedure` `:836` non-deleted entries for a patient · `/conditions` `:876`
   paginated catalog (`limit` ≤ 100) · `/chart-templates` `:902` all templates, and
   `POST /chart-templates` `:909`, which overwrites a **global** template body
@@ -56,7 +61,10 @@ Rendered by `src/components/patient-detail/charting/` (`ChartingContext.jsx`, `O
    add a route without it. Re-read the session with `.with_for_update()` **before** checking it,
    then mode, then status; every mutating route does, and one that does not is a race.
 2. `active` is the only status accepting chart-procedure writes; `active`+`draft` the only ones
-   accepting note writes. `signed`/`auto-sign` are terminal — no route reopens them. `POST
+   accepting note writes. **One deliberate exception:** `POST /chartprocedure/details` accepts
+   any session status, because fee/provider/date/note are administrative facts a practice must
+   be able to correct on a signed encounter. It buys that with a mandatory
+   `procedure_details_updated` audit row, and it cannot touch a clinical field. `signed`/`auto-sign` are terminal — no route reopens them. `POST
    /signed` requires `active`, `POST /autosign` requires `draft`; do not widen either.
 3. Any route mutating a session must call `_touch_session:249` (else the scheduler auto-drafts
    it away under the clinician) and log via `_add_audit_log:328`. No silent edits.
@@ -83,7 +91,7 @@ Rendered by `src/components/patient-detail/charting/` (`ChartingContext.jsx`, `O
    pytest** (pytest is not installed in `env/`, despite `CLAUDE.md` §1): ``` cd
    360_Flask_Appointment && ./env/Scripts/python -m unittest tests.test_charting_rules \
    tests.test_charting_sessions tests.test_chart_procedures tests.test_chart_session_notes \
-   tests.test_chart_session_scheduler tests.test_conditions_catalog   # 72 tests, ~1.5s ``` Sqlite
+   tests.test_chart_session_scheduler tests.test_conditions_catalog   # 83 tests, ~2.3s ``` Sqlite
    in-memory, `auth_get` and the bearer `requests.get` mocked. Each file builds its own bare
    `Flask` app with only the tables it needs — a new model must join that file's `setUpClass`.
 5. Wire-shape changes: update `PMS_React/src/api/charting.js` (or `chartSettings.js`) in the
