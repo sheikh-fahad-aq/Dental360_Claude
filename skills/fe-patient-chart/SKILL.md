@@ -128,6 +128,16 @@ automated check: `npm run lint`. No test suite.
   and redraw the column heads whenever `ensureSpace` reports a page break. Verified by parsing
   the generated content stream: 0 collisions, ink stops exactly on the 556pt text edge, heads
   on every item page, 0 orphaned detail lines across 12–30 items.
+- **"Scheduled" is a DERIVED label, not a plan status.** `planDisplayStatus` in
+  `txPlanFormat.js` shows it when the server's `scheduleCounts` say at least one accepted
+  procedure is booked and none is left unbooked; the clinical status survives as the
+  sub-line, because the practice is held to what the patient ACCEPTED and a booking is a
+  logistical fact on top of that. It is deliberately absent from `ck_treatment_plans_status`
+  for the same reason `archived` is: `_recalculate_plan_status` rewrites `status` on every
+  decision and would clobber it. Two edges the counts get right — `completed` does NOT count
+  as scheduled (finished work is past, and a done plan reading "Scheduled" sends the desk
+  hunting an appointment that already happened), and a plan with a still-undecided line
+  keeps "Awaiting patient decision" as its next step rather than falling silent.
 - **The email composer edits a BODY, never the whole email.** `EmailTemplateEditor` renders
   the chrome — banner, card, Review button — as fixed React markup and puts only the message
   in TipTap (already a dependency; StarterKit v3 ships `link` and `undoRedo`, so Bold /

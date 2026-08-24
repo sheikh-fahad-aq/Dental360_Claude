@@ -75,7 +75,21 @@ GET    /v2/treatment-plans/<planId>/events            the Activity tab          
    `_serialize_plan_for_patient`, which stays allow-listed.
 3. **This service never computes an estimate.** A figure is only ever what a caller
    supplied. The estimator lives in `PreAuth_Flask`, which is not in this workspace.
-4. **The patient's RESPONSE is the freeze, not the presentation.**
+4. **`scheduled` is DERIVED, never set by a caller.** `_recalculate_plan_status` moves a
+   plan there when every ACCEPTED item is booked and nothing is still awaiting a decision
+   — the same shape as `completed`, which has always been derived from item
+   `schedule_status`. Three rules it encodes: work that is entirely COMPLETED is past, not
+   upcoming, so it falls through to `completed`; an undecided line keeps the plan out of
+   `scheduled`, symmetrically with `completed`, because a booking does not settle a question
+   the patient has not answered; and `schedule_treatment_plan_phase` **and**
+   `unschedule_treatment_plan_item` both call the recalculation — neither did before, so a
+   fully booked plan used to sit at "Accepted" until the next unrelated decision.
+
+   It changes a LABEL, not the record: acceptance survives on every item, in
+   `acceptanceCounts`, in the events and in the signature. Doing it here rather than in the
+   SPA is what stops the two listings (the tx-plans table and the charting tab's) from
+   disagreeing — they both just render `statusLabel`.
+5. **The patient's RESPONSE is the freeze, not the presentation.**
    `EDITABLE_PLAN_STATUSES = {"draft", "presented"}` — a presented plan nobody has
    answered yet is still being negotiated, so phases and items stay editable. Editing
    closes the moment any decision is recorded (`partially_accepted`, `accepted`,
@@ -85,7 +99,7 @@ GET    /v2/treatment-plans/<planId>/events            the Activity tab          
    stays `{"draft"}` because erasing is not editing.
    The frontend mirror is `isPlanEditable()` in `PMS_React/src/api/treatmentPlans.js`;
    the two lists must agree or the builder shows affordances that 409 on click.
-5. **THREE REMOVAL VERBS, and they are not interchangeable.**
+6. **THREE REMOVAL VERBS, and they are not interchangeable.**
    - `archived_at` — put away. Leaves the listing, keeps status, decisions and
      signature. Reversible via `POST .../unarchive`. **This is the only one the SPA
      offers**, and the only one an operator means by "remove this plan".
@@ -122,7 +136,7 @@ GET    /v2/treatment-plans/<planId>/events            the Activity tab          
    `/v2/appointments/<id>/planned-treatment` (both routes) and `revoke_share` — the first
    two are how already-booked work reaches the chair and the bill, the third can only
    narrow access.
-6. **`origin` is authoring provenance, `response_source` is not.**
+7. **`origin` is authoring provenance, `response_source` is not.**
    `treatment_plans.origin` is `"chart"` (built from charted findings — the
    charting builder or Generate from Chart) or `"manual"` (typed on the patient's
    Treatment Plans page), and it is what that page groups by. An unknown value on
@@ -131,13 +145,13 @@ GET    /v2/treatment-plans/<planId>/events            the Activity tab          
    deliberately absent from `_serialize_plan_for_patient()`. Do not confuse it
    with `response_source`, which records how the PATIENT's answer arrived — a
    plan is routinely chart-authored and phone-answered.
-7. **The patient signature is write-once.** Re-signing is refused, and
+8. **The patient signature is write-once.** Re-signing is refused, and
    `submit_shared_decisions` refuses a closed plan outright via `_plan_closed_state`.
    Signing NO LONGER revokes the share token: it used to, and a patient who signed and
    refreshed — or whose phone dropped the response — met "this link is no longer
    available" with no way to tell whether their signature had landed. Write-once is
    enforced by the plan's terminal state, which is the thing that cannot be undone.
-8. **THE PATIENT LINK TAKES TWO FACTORS, and the second one is the real one.**
+9. **THE PATIENT LINK TAKES TWO FACTORS, and the second one is the real one.**
    The token says WHICH plan. It travels by email and leaks the way email leaks, so it
    is not permission to read a clinical document on its own. `POST
    .../shared/<token>/verify` compares a date of birth against a salted digest
@@ -168,13 +182,13 @@ GET    /v2/treatment-plans/<planId>/events            the Activity tab          
    The counter is keyed on the PLAN, not the token: re-sending rotates the token, and a
    token-keyed counter would let the practice hand an attacker a fresh budget on
    request. Rotation also revokes every existing session.
-9. **`/send` and `/share` must issue the SAME link.** Both stop the expiry, both snapshot
+10. **`/send` and `/share` must issue the SAME link.** Both stop the expiry, both snapshot
    the DOB, both revoke existing sessions on rotation, and both refuse with 409 when the
    date of birth is unreadable. `/send` was left behind once already: emailing a plan
    produced a token that died in 30 days while Copy link produced a permanent one — the
    same plan with two lifetimes depending on which button the coordinator pressed. Any
    future change to one belongs in the other.
-10. **Email variables are substituted SERVER-SIDE, and escaped.** `_fill_email_variables`
+11. **Email variables are substituted SERVER-SIDE, and escaped.** `_fill_email_variables`
    fills `[Form Link]`, `[Practice Name]` and `[Patient First Name]` in both the subject
    and the body. `[Form Link]` *cannot* be filled in the browser: `/send` rotates the share
    token as part of sending, so the review URL does not exist until the request is being
@@ -182,22 +196,22 @@ GET    /v2/treatment-plans/<planId>/events            the Activity tab          
    email, and a practice name carrying `&` or a patient name carrying `<` would otherwise
    break the markup or inject into it. The URL is deliberately NOT escaped; escaping it
    would corrupt the href.
-11. **The patient link does not expire, and a finished plan says so.**
+12. **The patient link does not expire, and a finished plan says so.**
    `share_token_expires_at` is NULL on issue (an explicit `expiresInDays` is still
    honoured and capped at 10 years). A patient returning to a plan they already
    answered gets `closed: {reason, at}` and an "already complete" screen rather than a
    dead link.
-12. **Public routes are allow-listed, not deny-listed.** `_serialize_plan_for_patient()`
+13. **Public routes are allow-listed, not deny-listed.** `_serialize_plan_for_patient()`
    names every field that may leave. Never build the public payload by serializing
    everything and popping keys — that fails open on the next field added.
-13. **Phase sequences are allocated, never caller-supplied,** and are never reused —
+14. **Phase sequences are allocated, never caller-supplied,** and are never reused —
    `_next_phase_sequence()` counts soft-deleted rows, because
    `uq_treatment_plan_phases_plan_sequence` does not exclude them.
-14. **Only `accepted` + `unscheduled` items are booked**, and an item whose
+15. **Only `accepted` + `unscheduled` items are booked**, and an item whose
    `AppointmentProcedure.is_completed` cannot be unscheduled — otherwise the same
    treatment lands on the bill twice.
-15. **`TreatmentPlanEvent.note` carries no PHI** — no signature bytes, no patient name.
-16. **`AppointmentProcedure.completed_at` is a naive `DateTime`.** Write `tzinfo=None`;
+16. **`TreatmentPlanEvent.note` carries no PHI** — no signature bytes, no patient name.
+17. **`AppointmentProcedure.completed_at` is a naive `DateTime`.** Write `tzinfo=None`;
    every other column here is `DateTime(timezone=True)`.
 
 ## Working here
