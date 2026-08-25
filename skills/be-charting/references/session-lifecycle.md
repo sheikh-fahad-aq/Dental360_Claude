@@ -1,7 +1,7 @@
 # Chart session lifecycle — gate matrix, wire shapes, error map
 
 Companion to `be-charting/SKILL.md`. All line numbers verified against
-`360_Flask_Appointment/app/charting_routes.py` (1671 lines).
+`360_Flask_Appointment/app/charting_routes.py` (1879 lines).
 
 ## 1. Status machine
 
@@ -29,7 +29,7 @@ Only `active` and `draft` are *open* (`OPEN_SESSION_STATUSES`, `:48`).
 ```
 
 Terminal states have no route back. There is **no unlock/reopen endpoint** — the frontend's
-"Unlock chart" (`PMS_React/.../charting/UnlockChartModal.jsx`) resolves to `POST /resume`,
+"Unlock chart" (`PMS_React/src/components/patient-detail/charting/UnlockChartModal.jsx`) resolves to `POST /resume`,
 which only works while the session is still `active` or `draft`.
 
 ## 2. Per-route gate matrix
@@ -109,8 +109,8 @@ session object id (`:477`).
 ## 6. Chart procedures
 
 - `type` ∈ `{TP, Cn, EC, EO}` (`CHART_PROCEDURE_TYPES:59`, mirrored by a DB CheckConstraint
-  `ck_chart_procedures_type` on `models.py:748`). `status` ∈ `{P, R, C, D}` (a Postgres enum
-  `chart_procedure_status_enum`, `models.py:718`).
+  `ck_chart_procedures_type` on `models.py:755`-`:757`). `status` ∈ `{P, R, C, D}` (a Postgres enum
+  `chart_procedure_status_enum`, `models.py:723`-`:729`).
 - Default status is `P` for `TP`, `C` for everything else (`_chart_procedure_default_status:64`).
 - `POST /chartprocedure` is an **upsert, not an insert**: it matches on
   `(session_id, type, cdt_code, tooth_number, condition_type)` *plus* whether the incoming
@@ -160,3 +160,23 @@ Under `360_Flask_Appointment/migrations/versions/`: `20260723_charting.py` (base
 The open-session partial unique index lives in `20260728_clinical_session_contract.py:111`
 (clinical) and `20260724_chart_session_ownership.py:31` (edit-only, currently dead — see the
 SKILL's Traps).
+
+## 10. `src/api/charting.js` exports with no backend route
+
+Seven exports in `PMS_React/src/api/charting.js` describe endpoints this blueprint does not
+serve. With the chart API configured they 404; with `VITE_APP_BASE_URL_CHART` unset the module
+falls back to **mock**, which is why they look like they work. Verified against the 17-route
+`grep -nE "@charting_routes.route"` listing.
+
+| export | line | claimed route |
+|---|---|---|
+| `updateChartSession` | `:570` | `PATCH /v2/charts/sessions/{id}` |
+| `saveVisitNote` | `:599` | — |
+| `addProcedure` | `:631` | — |
+| `fetchChartCatalog` | `:1085` | — |
+| `updateToothStatus` | `:1101` | — |
+| `addToothEntry` | `:1128` | — |
+| `removeToothEntry` | `:1145` | — |
+
+Doc-comments in that file are proposed contract, not shipped contract. Before wiring one up,
+add the Flask route first.

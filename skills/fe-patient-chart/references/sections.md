@@ -17,37 +17,45 @@ One row per entry in `src/config/patientSections.js`. "Page export" is the named
 | `family` | `family` | `PatientFamilyPage` | `family/` (3 files) | `useRelatedPeople`, `useFamilyNote` | live |
 | `insurance` | `insurance` | `PatientInsurancePage` | `patient-detail/insurance/` | `usePatientInsuranceData` | live — **fe-insurance-claims** |
 | `appts` | `appts` | `PatientApptsPage` | `appts/` (2 files) | `usePatientAppointments` | live |
-| `billing` | `billing` | `PatientBillingPage` | `patient-detail/billing/` | `usePatientClaims` + `ledger/LedgerWorkspace` | claims live, ledger live — **fe-insurance-claims / fe-ledger** |
-| `tx-plans` | `tx-plans` | `PatientTxPlansPage` | `tx-plans/` (7 files + `builder/` 12) | `usePatientTreatmentPlans` + `usePatientChartFindings` -> `/v2/treatment-plans`, `/v2/charts/chartprocedure` | **partial** (live list/create/builder; no Present/Send) |
+| `billing` | `billing` | `PatientBillingPage` | `billing/` (3 files) | `claims/ClaimsWorkspace` + `ledger/LedgerWorkspace` (`BillingSection.jsx:4-5`) | claims live, ledger live — **fe-insurance-claims / fe-ledger** |
+| `tx-plans` | `tx-plans` | `PatientTxPlansPage` | `tx-plans/` (7 files + `builder/` **17**) | `usePatientTreatmentPlans` + `usePatientChartFindings` -> `/v2/treatment-plans`, `/v2/charts/chartprocedure` | **live** — list, create, builder, Present, Send, archive, and the public `/tp/:token` page. See `tx-plans.md`. |
 | `notes` | `notes` | `PatientNotesPage` | `notes/` (5 files) | `usePatientNotes` | live |
 | `images` | `images` | `PatientImagesPage` | `images/ImagesSection.jsx` | none | **stub** |
 | `labs` | `labs` | `PatientLabsPage` | `labs/` (2 files) | `usePatientLabCases` | live |
 | `medical-hx` | `medical-hx` | `PatientMedicalHxPage` | `medical-hx/` (12 files) | `usePatientMedicalHx` | live |
-| `forms` | `forms` | `PatientFormsPage` | `forms/` (4 files) | `usePatientForms`, `api/forms.js` | live |
-| `docs` | `docs` | `PatientDocsPage` | `docs/` (4 files) | `usePatientLabCases`, `usePatientAppointments` | **mock** except lab cases |
+| `forms` | `forms` | `PatientFormsPage` | `forms/` (5 files) | `usePatientForms`, `api/forms.js` | live — **fe-forms** |
+| `docs` | `docs` | `PatientDocsPage` | `docs/` (5 files) | `api/documents.js` (**`appointmentApi`**) + `usePatientAppointments` | **live** — was mock; `DocsSection.jsx:50-61` now imports the real upload/folder/document calls and gates on `isDocumentsApiEnabled()` `:498` |
 | `journal` | `journal` | `PatientJournalPage` | `journal/` (2 files) | `usePatientAppointments` + `api/appointments.js` | **partial** — read-only |
 | `comms` | `comms` | `PatientCommsPage` | `comms/CommsSection.jsx` | none | **stub** |
 | `schedule` | `schedule` | `PatientSchedulePage` | `schedule/ScheduleSection.jsx` | `SchedulingContext` | live — **fe-scheduling** |
+| `post-op` | `post-op` | `PatientPostOpPage` | `post-op/` (4 files) | none — `EMPTY_TEMPLATES` / `EMPTY_DELIVERIES` `PostOpSection.jsx:17-18` | **stub** |
 | `audit-trail` | **`history`** | `PatientHistoryPage` | `audit/` (2 files) | `usePatientAuditTrail` | live |
 
-`post-op` is **commented out** in `src/config/patientSections.js:81-87`. The README module
-heading calls the grid "18-entry"; only 17 entries render. Any unlisted `:section` segment
-falls through the catch-all route to `PatientSectionPlaceholderPage`.
+**18 entries render.** `post-op` was commented out; it is live again at
+`src/config/patientSections.js:86-92` (`available: true`), with a real `post-op/` directory and a
+`<Route path="post-op">` at `AppRoutes.jsx:364` — so `README.md:238`'s "18-entry" is now right and
+`README.md:259`'s `available: false` is wrong. Nothing filters on `available`
+(`PatientChartSidebar.jsx:360` maps the array straight). Any unlisted `:section` segment falls
+through the catch-all to `PatientSectionPlaceholderPage`.
 
 ### Stub / mock evidence
 
-- `comms/CommsSection.jsx:51-53` — `const conversations = []`, `emails = []`, `calls = []`.
-  No API import anywhere in the file.
-- `images/ImagesSection.jsx:42-52` — the file picker and both action buttons only `toast(...)`
+- `comms/CommsSection.jsx:52-54` — `const conversations = []`, `emails = []`, `calls = []`.
+  No API import anywhere in the file. 175 lines total.
+- `images/ImagesSection.jsx:43,:48,:52` — the file picker and both action buttons only `toast(...)`
   ("Imaging upload API is not available yet."). 105 lines total.
-- `tx-plans/` is no longer mock: `TxPlansSection.jsx` reads `usePatientTreatmentPlans`
-  (plans) and `usePatientChartFindings` (charted treatment not yet on a plan). Both refuse
-  to fall back to seeds — a fabricated treatment plan is a financial document.
-  `tx-plans/GenerateFromChartDrawer.jsx:17-18,223,245,272` reads `MOCK_CURRENT_VISIT_FINDINGS` /
-  `ALL_MOCK_FINDINGS` from `txPlanMockFindings.js`. **It never touches the odontogram.**
-- `docs/DocsSection.jsx:489` — the only real documents are `labCaseToDoc(...)` rows built from
-  `usePatientLabCases`. `:980` toasts "Document upload API is not available yet."; Rotate,
-  Share, Open-in-new-tab, Move all toast (`:296,:304,:333,:341,:752,:941`).
+- `post-op/PostOpSection.jsx:1-14` imports `PatientsContext`, `SchedulingContext`, `ToastContext`
+  and `appointmentQueries` — **no `src/api/` module at all**; templates and deliveries start from the
+  module-level `EMPTY_TEMPLATES` / `EMPTY_DELIVERIES` constants (`:17-18`). It is 370 lines and looks
+  finished; it persists nothing.
+- `tx-plans/` is not mock anywhere any more. `TxPlansSection.jsx` reads `usePatientTreatmentPlans`
+  (plans) and `usePatientChartFindings` (charted treatment not yet on a plan); both refuse to fall
+  back to seeds — a fabricated treatment plan is a financial document.
+  `GenerateFromChartDrawer.jsx:16` now calls `fetchChartProcedures` and maps real ChartProcedures at
+  `:21`; the old `txPlanMockFindings.js` **no longer exists** in the tree.
+- `docs/` is not mock any more either: `DocsSection.jsx:50-61` imports `listPatientDocuments`,
+  `uploadPatientDocument`, the folder CRUD and `fetchPatientDocumentFile` from `src/api/documents.js`,
+  and `:498` gates on `isDocumentsApiEnabled()`. No "not available yet" string survives in the file.
   `docs/docsFolders.js` is folder *structure*, not seed documents.
 - `journal/JournalSection.jsx:345` — "Journal entry API is not available yet." Reads are real
   (`listPatientAppointments`); writes are not.
@@ -61,7 +69,7 @@ All under `src/hooks/`. Every one returns the house shape
 
 | hook | lines | returns (beyond the house keys) | notes |
 |---|---|---|---|
-| `usePatientDetail.js` | 169 | `patient`, `enriching`, `setPatient` | **The only TanStack Query hook in the slice.** Key `patientKeys.detail(id)` from `src/lib/queryClient.js:22`. `source` can be `'api'`, `'mock'`, or **`'mock-fallback'`** — a fourth value the house convention does not list. Also exports `createPlaceholderPatient(patientId)`. |
+| `usePatientDetail.js` | 169 | `patient`, `enriching`, `setPatient` | **The only TanStack Query hook in the slice.** Key `patientKeys.detail(id)` from `src/lib/queryClient.js:22` (`usePatientDetail.js:96`). `source` can be `'api'`, `'mock'`, or **`'mock-fallback'`** — a fourth value the house convention does not list. Also exports `createPlaceholderPatient(patientId)`. |
 | `usePatientContact.js` | 200 | `phones`, `preferences`, `addPhone`, `editPhone`, `removePhone`, `setPrimaryPhone`, `savePreferences` | |
 | `usePatientMedicalHx.js` | 630 | `alerts`, `allergies`, `conditions`, `medications`, `vitals`, `socialHabits`, `questionnaireAnswers`, `dentalAnswers`, `premedAnswers`, `emergencyContact`, `additionalNotes` + 14 mutators | Loads ~8 resources in parallel; `:234` is the **only** place in the repo that emits `source: 'api-partial'`. |
 | `usePatientNotes.js` | 107 | `notes` + mutators | |
@@ -69,16 +77,18 @@ All under `src/hooks/`. Every one returns the house shape
 | `useFamilyNote.js` | 156 | `note`, `saving`, `saveNote`, `clearNote`; also exports `extractFamilyNoteText` | |
 | `usePatientAppointments.js` | 95 | `appointments` | Calls `getClinicId()` at `:58`. |
 | `usePatientAuditTrail.js` | 86 | `entries` | **API-only — never seeds mock rows** (`:26-30` returns empty when the API is off). Errors if the id is non-numeric. |
-| `usePatientForms.js` | 141 | `forms` + mutators | |
-| `usePatientLabCases.js` | 296 | `cases` + mutators | Shared with `docs/`. |
+| `usePatientForms.js` | 223 | `forms` + mutators | Owned by **fe-forms**. |
+| `usePatientLabCases.js` | 296 | `cases` + mutators | Owned by **fe-labs**. `docs/` no longer uses it — it reads `api/documents.js`. |
 | `usePatientChartAlerts.js` | 252 | alert buckets for the sidebar | |
 | `usePatientSidebarSummary.js` | 164 | sidebar counts/balance | `getClinicId()` at `:100`. |
 | `usePatientsList.js` | 93 | `patients`, `total`, `meta` | 300 ms debounce (`SEARCH_DEBOUNCE_MS`). Powers both `/patients` and `/ledger`. |
-| `usePatientSearch.js` | 187 | `results` | Debounced **phone** search; needs `MIN_PHONE_DIGITS`. |
+| `usePatientSearch.js` | 187 | `results` | Debounced **phone** search; `MIN_PHONE_DIGITS` is 3 (`:15`). |
 | `usePatientQuickSearch.js` | 91 | `results` | Consumed by scheduling drawers, not by the chart. |
 | `useRecentPatients.js` | 51 | `{ recent, trackPatient }` | **Off-shape.** `localStorage` key `practice-dental-recent-patients`, max 5, syncs across tabs via the `storage` event. |
 | `usePatientFamily.js` | 2 | — | Deprecated re-export alias of `useRelatedPeople`. **Imported by nothing.** |
-| `usePatientInsuranceData.js` / `usePatientClaims.js` | — | — | Owned by **fe-insurance-claims**. |
+| `usePatientTreatmentPlans.js` | 162 | `plans`, `archivePlan`, `unarchivePlan`, `createPlan`; takes `includeArchived` | **Refuses to seed** — `source: 'unavailable'` (`:32,:51,:64,:96`) when `VITE_APP_BASE_URL_CHART` is unset. Not location-scoped (`:73`). No `deletePlan` / `voidPlan`. |
+| `usePatientChartFindings.js` | 133 | `findings`, `planIndex`, `membershipKnown` | Charted treatment not yet on a plan. Also refuses to seed. `membershipKnown` is false when the item-index read fails, so the caller can say so instead of claiming everything is unplanned. |
+| `usePatientInsuranceData.js` | — | — | Owned by **fe-insurance-claims**. There is **no `usePatientClaims.js`** in `src/hooks/`; `BillingSection` mounts `claims/ClaimsWorkspace` directly. |
 
 `src/services/patientApiService.js` (203 lines) sits between the hooks and `src/api/patients.js`:
 `fetchPatientCore`, `enrichPatientSubresources`, `fetchPatientsPage`, `fetchPatientById`,
@@ -113,11 +123,11 @@ same split — `GET|POST /v2/patients/:patientId/<plural>` but `PUT|DELETE /v2/p
 | audit trail | `GET …/:id/audit-trail` (`from`, `to`, `user_id`, `action_type`, `tooth`) | — |
 
 There is **no `deletePatient` export** — deleting a patient never leaves the browser.
-Forms endpoints are re-exported from `./forms` at `src/api/patients.js:306-319`.
+Forms endpoints are re-exported from `./forms` at `src/api/patients.js:306-315`.
 
 ### Patient list / search routing
 
-`src/services/patientApiService.js:134-150`:
+`src/services/patientApiService.js:134` (`fetchPatientsPage`):
 
 - `search.trim().length < 2` → `GET /v2/patients?clinic_id=&page=&limit=`
 - ≥ 2 chars and ≥ 7 digits after `replace(/\D/g,'')` → `GET /v2/patients/search?clinic_id=&phone=&limit=`
@@ -125,7 +135,7 @@ Forms endpoints are re-exported from `./forms` at `src/api/patients.js:306-319`.
 
 When the API is on, `PatientCharts.jsx` passes `search: ''` into `applyPatientTableQuery` so the
 server does the searching; filters and sort still run client-side over the current page only
-(`src/pages/PatientCharts.jsx:259-268`).
+(`src/pages/PatientCharts.jsx:263`).
 
 ---
 
@@ -138,7 +148,7 @@ is the single normalizer. Consequences worth knowing:
   `parseDobToISO(dob)` `:239` converts back for the wire; `parsePatientDob` in
   `src/utils/patientTableQuery.js:20` parses the same display format for sorting.
 - `view.age` is computed locally from the ISO dob (`computeAgeFromISO` `:36`), never read from the API.
-- `view.insurance.status` is hard-coded `'needed'` and `verified_date` `null` (`:33-38`) —
+- `view.insurance.status` is hard-coded `'needed'` and `verified_date` `null` (`:161-166`) —
   the real state comes from `usePatientInsuranceData`, not from the patient record.
 - `view._api.raw` keeps the untouched payload; `_placeholder` / `_seeded` mark synthetic shells.
 - `parsePatientIdForApi(patientId)` `:234` → `Number.parseInt` or `null`. Every hook that hits the
@@ -157,10 +167,10 @@ is the single normalizer. Consequences worth knowing:
 | file | lines | role |
 |---|---|---|
 | `src/components/patient-detail/PatientChartSidebar.jsx` | 529 | Avatar, balance, status, the `PATIENT_SECTIONS` grid as `NavLink`s, alerts trigger. Uses `usePatientChartAlerts` + `usePatientSidebarSummary`. |
-| `src/components/patient-detail/PatientAlertsPanel.jsx` | 379 | Portal overlay. `createPortal` + `AnimatePresence` + `OverlayBackdrop`, `OVERLAY_Z_INDEX`. |
+| `src/components/patient-detail/PatientAlertsPanel.jsx` | 354 | Portal overlay. `createPortal` + `AnimatePresence` + `OverlayBackdrop`, `OVERLAY_Z_INDEX`. |
 | `src/components/patient-detail/PatientSectionHeader.jsx` | 122 | Title from `getPatientSectionTitle(sectionId)`; per-section action rows (`charting`, `insurance`, `billing`, `schedule`, `appts`, `overview`). Renders `charting/ChartingHeaderControls`. |
 | `src/components/patient-detail/PatientSectionPlaceholder.jsx` | 18 | "coming soon" `EmptyState`. |
-| `src/components/patient-detail/PatientDetailSkeleton.jsx` | 207 | Default export `PatientDetailPageSkeleton`, re-exported by `src/components/ui/Skeleton.jsx:4`. **Only consumer is `PatientDetail.legacy.jsx:833`, which is dead** — so this file is effectively dead too. The live loading state is the inline `RouteFallback({ forPatientChart })` in `src/components/AppRoutes.jsx:91`. |
+| `src/components/patient-detail/PatientDetailSkeleton.jsx` | 207 | Default export `PatientDetailPageSkeleton`, re-exported by `src/components/ui/Skeleton.jsx:4`. **Only consumer is `PatientDetail.legacy.jsx:833`, which is dead** — so this file is effectively dead too. The live loading state is the inline `RouteFallback({ forPatientChart })` in `src/components/AppRoutes.jsx:95`. |
 | `src/components/patient-detail/shared/patientSectionUi.jsx` | 88 | `ApiErrorBanner`, `SectionToolbar`, `DetailField`, `StatusPill`, `FormField`, `inputClass` / `selectClass` / `labelClass` / `textareaClass`. |
 | `src/components/patient-detail/shared/SimpleFormDialog.jsx` | 119 | Small modal used by journal, docs, billing, claims. |
 
@@ -169,7 +179,7 @@ is the single normalizer. Consequences worth knowing:
 | key | store | written by |
 |---|---|---|
 | `practice-dental-recent-patients` | localStorage | `src/hooks/useRecentPatients.js:3` |
-| `pd:patient-chart-panel-collapsed` | sessionStorage | `src/pages/PatientDetail.jsx:417,427` |
+| `pd:patient-chart-panel-collapsed` | sessionStorage | `src/pages/PatientDetail.jsx:424,434` |
 | `pd:medical-hx-reviewed:<patientId>` | localStorage | `src/components/patient-detail/medical-hx/MedicalHxSection.jsx:47` |
 
 The medical-hx key embeds a patient id, so on a shared front-desk workstation the key list is

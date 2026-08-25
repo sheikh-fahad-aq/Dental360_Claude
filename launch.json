@@ -14,7 +14,7 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["run.py"],
       "cwd": "360_Flask_Appointment",
-      "port": 5001
+      "port": 5002
     }
   ]
 }

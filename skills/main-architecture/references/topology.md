@@ -24,9 +24,12 @@ Three independent histories. A commit never spans two of them. Neither app repo 
 6. Flask receives it. Every blueprint is mounted at `url_prefix='/api'`, so a SPA path of
    `/__appointment_api/api/v2/appointments` arrives as `/api/v2/appointments`.
 
-**The proxy is declared in two files and both must change together.** Editing only
-`vite.config.js` breaks production; editing only `vercel.json` breaks local dev. Neither
-failure shows up in the other environment, so this survives review easily.
+**The proxy is declared in three blocks across two files, and all three must change
+together** — `server.proxy` (`PMS_React/vite.config.js:49`), `preview.proxy` (`:67`) and
+`rewrites` (`PMS_React/vercel.json:3`). Editing only `vite.config.js` breaks production;
+editing only `vercel.json` breaks local dev; forgetting `preview.proxy` breaks only
+`npm run preview`. No failure shows up in the other environment, so this survives review
+easily.
 
 ## Environment variables (frontend)
 
@@ -64,7 +67,11 @@ message, or a log line.
 
 ## Ports and processes
 
-- Backend: `python run.py` → `:5001`, `debug=True`, **`use_reloader=False`**.
+- Backend: `python run.py` → `:5002`, `debug=True`, **`use_reloader=False`**
+  (`360_Flask_Appointment/run.py:17-19`). The port is `int(os.getenv("APPOINTMENT_DEV_PORT",
+  "5002"))` — 5002 and not 5001 because `PreAuth_Flask` binds 5001 and the two services now
+  have to run at the same time: PreAuth's ledger reads charted procedures from this host
+  over HTTP. Set `APPOINTMENT_DEV_PORT` if 5002 collides on your machine.
   The reloader is disabled deliberately: `app/chart_session_scheduler.py` starts an
   in-process scheduler from `create_app()`, and a second process would run every job twice.
   The same constraint applies to any multi-worker WSGI deployment.
@@ -74,5 +81,5 @@ message, or a log line.
 ## What is not here
 
 `360auth` and the pre-auth/eligibility API are external services. Their routes, models and
-migrations are not in this workspace, and 23 of the 31 frontend API modules target them.
-See `api-contract-matrix.md`.
+migrations are not in this workspace, and 22 of the 34 domain modules in
+`PMS_React/src/api/` target them exclusively. See `api-contract-matrix.md`.

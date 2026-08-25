@@ -34,19 +34,21 @@ Never put a secret behind one (workspace `CLAUDE.md` §7.2). Read in `src/api/co
 
 ## 2. The four clients
 
-`src/api/client.js` — the only file in the repo that calls `fetch()` (grep-verified: zero hits
-elsewhere in `src/`).
+`src/api/client.js` is where `fetch()` belongs. Grep-verified exceptions — three, all inside `src/api/`, all
+binary downloads that need the raw `Response`: `claims.js:496` (`fetchClaimAttachmentFile`) and `documents.js:240`
+re-build the headers by hand from `getAuthToken()` + `getApiKey()`; `documents.js:271` follows a signed URL out of
+the JSON envelope with a bare `fetch(signed)` and no headers argument at all. Zero hits anywhere else under `src/`.
 
 | Export | Line | Base |
 |---|---|---|
-| `authApi` | `:194` | `VITE_APP_BASE_URL_AUTH`, direct |
-| `preAuthApi` | `:197` | `VITE_APP_BASE_URL_PRE_AUTH`, direct |
-| `appointmentApi` | `:200` | **always** `/__appointment_api/api` |
-| `chartApi` | `:203` | **always** `/__chart_api/api` |
-| `api` (default) | `:206` | `@deprecated` alias of `authApi` — do not use in new code |
-| `ApiError`, `createApiClient`, `getAuthToken`, `setAuthToken`, `TOKEN_KEY` | `:209`, `:24`, `:14` | `TOKEN_KEY = 'pd:token:v1'` |
+| `authApi` | `:200` | `VITE_APP_BASE_URL_AUTH`, direct |
+| `preAuthApi` | `:203` | `VITE_APP_BASE_URL_PRE_AUTH`, direct |
+| `appointmentApi` | `:206` | **always** `/__appointment_api/api` |
+| `chartApi` | `:209` | **always** `/__chart_api/api` |
+| `api` (default) | `:212` | `@deprecated` alias of `authApi` — do not use in new code |
+| `ApiError`, `createApiClient`, `getAuthToken`, `setAuthToken`, `TOKEN_KEY` | `:215`, `:24`, `:14` | `TOKEN_KEY = 'pd:token:v1'` |
 
-Method shapes (`client.js:182-190`):
+Method shapes (`client.js:188-196`):
 
 ```
 get(path, config)            delete(path, config)
@@ -56,7 +58,7 @@ config = { params, data, headers, signal, includeBearer }
 resolves  { data, status, headers }        throws ApiError { message, status, data, url }
 ```
 
-Request pipeline (`client.js:132-180`): path joined to base (an absolute `http…` path bypasses the
+Request pipeline (`client.js:138-186`): path joined to base (an absolute `http…` path bypasses the
 base) → `new URL(joined, window.location.origin)` so relative proxy bases work → `params` appended,
 skipping `undefined`/`null`/`''` → body `JSON.stringify`d unless `FormData` → `buildHeaders`
 (`:36`) sets `Accept`, `Content-Type` (not for FormData), `x-api-key`, `Authorization: Bearer` →
@@ -66,13 +68,13 @@ skipping `undefined`/`null`/`''` → body `JSON.stringify`d unless `FormData` �
 `pd:auth:v1`, hard-navigate to `ROUTES.login` — fires **only when the URL contains
 `/validate_token`**. A 401 from any other endpoint just throws an `ApiError`.
 
-Diagnostics, both `import.meta.env.DEV`-gated: `client.js:119-121` logs status + URL + body on any
-failure; `client.js:167-169` logs every URL containing `appointments`. Both print URLs that carry
+Diagnostics, both `import.meta.env.DEV`-gated: `client.js:125-127` logs status + URL + body on any
+failure; `client.js:173-175` logs every URL containing `appointments`. Both print URLs that carry
 patient ids — the DEV gate is what keeps them compliant with `CLAUDE.md` §7.1.
 
 ### Envelope shapes
 
-22 of the 31 modules under `src/api/` define their own local `unwrap()`. Three shapes exist:
+25 of the 35 modules under `src/api/` define their own local `unwrap()`. Three shapes exist:
 
 1. `{ success, data }` — throw on `success === false`, else return `data ?? responseData`
    (`locations.js:4-12`, `patients.js:9`, `auth.js:12`)
@@ -94,54 +96,79 @@ concurrent identical requests hit the network once. Used by `providers.js`, `roo
 
 ## 3. Routes
 
-Registered in `src/components/AppRoutes.jsx:164-342`. Maturity from `PMS_React/README.md`.
+Registered in `src/components/AppRoutes.jsx:170-367`. Maturity from `PMS_React/README.md`.
 
-### Public (no `ProtectedRoute`, no sidebar/header — `App.jsx:24-25` branches on pathname)
+### Public (no `ProtectedRoute`, no sidebar/header)
+
+Three prefixes render standalone: `/login`, `/f/`, `/tp/`. The list exists **twice** — `App.jsx:24,25,35`
+(which shell to render) and `AppRoutes.jsx:145-147` (which Suspense fallback to show). A new public prefix
+must be added to both; adding it only to `AppRoutes` leaves the practice sidebar wrapped around a patient's
+own document, which is exactly the bug `/tp/` shipped with. `README.md:185` still says only `/login*` and
+`/f/*` render without chrome — stale.
 
 | Path | Element | Line |
 |---|---|---|
-| `/login` `/login/forgot-password` `/login/reset-password` `/login/otp` | Login / ForgotPassword / ResetPassword / Otp | `:165-168` |
-| `/f/:token` | `PatientFormLinkPage` — **localStorage only, no backend** | `:169` |
+| `/login` `/login/forgot-password` `/login/reset-password` `/login/otp` | Login / ForgotPassword / ResetPassword / Otp | `:171-174` |
+| `/f/:token` | `PatientFormLinkPage` — **localStorage only, no backend**; see `fe-forms` | `:175` |
+| `/tp/:token` | `SharedTreatmentPlanPage` (585 lines) — **live** patient treatment-plan review | `:177` |
+
+`/tp/:token` is **two-factor and unauthenticated**: `ROUTES.sharedTreatmentPlan(token)` (`routes.js:19`) →
+`verifySharedTreatmentPlan(token, { dateOfBirth })` (`api/treatmentPlans.js:801`) — the DOB travels in the
+**body**, never a query string, or it would land in access logs and `Referer` (§7.1). It returns an `accessToken`
+held in state (`SharedTreatmentPlanPage.jsx:271`) and replayed as an `X-Plan-Access` header on the plan read
+(`treatmentPlans.js:822`) and the decision POST (`:864`). The credential is **never** written to
+`localStorage`/`sessionStorage` (§7.3) — a refresh re-asks for the DOB. All calls go over `chartApi`, so the
+`/__chart_api` proxy must be up for the public page to work at all. Stages are `verify → ready → done`,
+plus `unavailable` when the token is missing or dead (`:403,420,433`); inside `ready` the page has `about` and
+`plan` tabs (`:526-527`).
+The plan domain itself (builder, PDF, email, compare) is **fe-patient-chart**; the API is
+**be-treatment-plans**. `/tp/:token` is absent from both README route tables (`/f/:token` is at `README.md:183`).
 
 ### Protected
 
 | Path | Element | Line | State |
 |---|---|---|---|
-| `/` | `PatientCharts` — `{/* <Dashboard /> */}` commented out beside it | `:171-179` | live |
-| `/patients` | `PatientCharts` | `:180-187` | live |
-| `/charts` | `<Navigate to="/patients" replace>` (not wrapped in `ProtectedRoute`) | `:188` | — |
-| `/scheduling` | `Scheduling` | `:189-196` | live |
-| `/revenue-reports` | redirect → `ROUTES.revenueReport()` = `/revenue-reports/daily-huddle` | `:197-204` | **absent from the README route table** |
-| `/revenue-reports/:reportSlug` | `RevenueReports` → `DailyHuddleView` (639 lines, scheduling) | `:205-212` | see `fe-scheduling` |
-| `/lists` → `/lists/:worklistId` | redirect, then `Lists` | `:213-228` | placeholder |
-| `/forms` | `Forms` | `:229-236` | partial |
-| `/payments` | `Payments` | `:237-244` | placeholder |
-| `/ledger` | `Ledger` | `:245-252` | live |
-| `/ledger/:patientId/portion` | `LedgerPortion` — **registered before** the next row | `:253-262` | live |
-| `/ledger/:patientId` | `LedgerPatient` | `:263-270` | live |
-| `/labs` | `Labs` | `:271-278` | live |
-| `/documents` | `Documents` | `:279-286` | chrome only |
-| `/fee-schedules` | `FeeSchedules` | `:287-294` | mock (in-memory) |
-| `/settings` → `/settings/:sectionId` | redirect to `DEFAULT_SETTINGS_SECTION_ID`, then `Settings` | `:295-313` | 32 sections, 12 wired |
-| `/patients/:patientId` + 17 children | `PatientDetail` with `<Outlet>` | `:314-341` | mixed |
+| `/` | `PatientCharts` — `{/* <Dashboard /> */}` commented out beside it | `:179-187` | live |
+| `/patients` | `PatientCharts` | `:188-195` | live |
+| `/charts` | `<Navigate to="/patients" replace>` (not wrapped in `ProtectedRoute`) | `:196` | — |
+| `/scheduling` | `Scheduling` | `:197-204` | live |
+| `/revenue-reports` | redirect → `ROUTES.revenueReport()` = `/revenue-reports/daily-huddle` | `:205-212` | **absent from the README route table** |
+| `/revenue-reports/:reportSlug` | `RevenueReports` → `DailyHuddleView` (scheduling) | `:213-220` | see `fe-scheduling` |
+| `/lists` → `/lists/:worklistId` | redirect, then `Lists` | `:221-236` | placeholder |
+| `/forms` | `Forms` | `:237-244` | partial |
+| `/payments` | `Payments` | `:245-252` | placeholder |
+| `/claims` | `Claims` — the practice-wide workbench | `:253-260` | live (`fe-insurance-claims`) |
+| `/unbilled-procedures` | `UnbilledProcedures` | `:261-268` | see `fe-insurance-claims`; **absent from the README route table** |
+| `/ledger` | `Ledger` | `:269-276` | live |
+| `/ledger/:patientId/portion` | `LedgerPortion` — **registered before** the next row | `:279-286` | live |
+| `/ledger/:patientId` | `LedgerPatient` | `:287-294` | live |
+| `/labs` | `Labs` | `:295-302` | live |
+| `/documents` | `Documents` | `:303-310` | chrome only |
+| `/fee-schedules` | `FeeSchedules` | `:311-318` | mock (in-memory) |
+| `/settings` → `/settings/:sectionId` | redirect to `DEFAULT_SETTINGS_SECTION_ID`, then `Settings` | `:319-337` | 32 sections, 12 wired |
+| `/patients/:patientId` + 18 section children | `PatientDetail` with `<Outlet>` | `:338-366` | mixed |
 
-Chart children (`:322-340`): index → `overview`; then `overview insurance charting history notes
-family appts labs tx-plans schedule medical-hx forms images docs journal comms billing`, and a
-`:section` catch-all rendering `PatientSectionPlaceholderPage`.
+Chart children (`:346-365`): index → `overview`; then `overview insurance charting history notes
+family appts labs tx-plans schedule medical-hx forms images docs journal comms billing post-op`, and a
+`:section` catch-all rendering `PatientSectionPlaceholderPage`. `post-op` is a **real** route rendering
+`PostOpSection` (`pages/PatientDetail.jsx:389`); the README still lists Post-Op as `available: false`.
 
 **There is no top-level `path="*"` route.** An unknown URL like `/nope` matches nothing: the app
 chrome renders and the content area is blank, with no 404 screen and no console error.
 
-`src/config/routes.js` also exports `DEFAULT_REVENUE_REPORT_SLUG = 'daily-huddle'` (`:36`),
-`getPageTransitionKey(pathname)` (`:39`) and `isNavItemActive(navPath, pathname)` (`:62`).
+`src/config/routes.js` also exports `DEFAULT_REVENUE_REPORT_SLUG = 'daily-huddle'` (`:42`),
+`getPageTransitionKey(pathname)` (`:45`, with `/f/` and `/tp/` branches at `:47-48`) and
+`isNavItemActive(navPath, pathname)` (`:71`). Token links are built with `ROUTES.patientFormLink(token)`
+(`:17`) and `ROUTES.sharedTreatmentPlan(token)` (`:19`) — never a literal string.
 
 ### Lazy loading
 
 Every route element is `lazy()`. Named exports out of `pages/PatientDetail.jsx` go through
 `lazyNamed(importer, exportName)` (`AppRoutes.jsx:12-24`), which throws a readable
 "Try a full page refresh" error instead of rendering an `undefined` HMR stub.
-`Suspense` fallback picks between `AuthFallback` (`:125`) and `RouteFallback` (`:91`), the latter
-switching to a chart-shaped skeleton when the path matches `/^\/patients\/[^/]+/` (`:142`).
+`Suspense` fallback picks between `AuthFallback` (`:129`, used for all three public prefixes) and
+`RouteFallback` (`:95`), the latter switching to a chart-shaped skeleton when the path matches
+`/^\/patients\/[^/]+/` (`:148`).
 
 `src/utils/routePrefetch.js`: `importRevenueReports` (shared with the `lazy()` call so one chunk is
 emitted), `onIdle(fn, timeout)`, `prefetchRevenueReports()`. Called from
@@ -154,21 +181,21 @@ emitted), `onIdle(fn, timeout)`, `prefetchRevenueReports()`. Called from
 Outermost first. `App.jsx` line numbers in brackets.
 
 ```
-ErrorBoundary [58]
-└ QueryClientProvider [59]        src/lib/queryClient.js — staleTime 60s, gcTime 5m,
-  └ BrowserRouter [60]              refetchOnWindowFocus false, retry 1; patientKeys factory
-    └ ToastProvider [61]          → fe-platform
-      └ AuthProvider [62]         → fe-auth
-        └ ChartSettingsProvider [69]  → fe-charting (above LocationProvider on purpose:
-          └ LocationProvider [70]        clinic-scoped, fetched once per session)
-            └ SidebarProvider [71]    → fe-platform
-              └ PatientsProvider [72]     seeded from src/data/patients — MOCK
-                └ ProvidersProvider [73]
-                  └ ServicesProvider [74]
-                    └ RoomsProvider [75]
-                      └ SchedulingProvider [76]  → fe-scheduling (69 KB)
-                        ├ AppShell [77]
-                        └ RouteSlipHost [78]
+ErrorBoundary [68]
+└ QueryClientProvider [69]        src/lib/queryClient.js — staleTime 60s, gcTime 5m,
+  └ BrowserRouter [70]              refetchOnWindowFocus false, retry 1; patientKeys factory
+    └ ToastProvider [71]          → fe-platform
+      └ AuthProvider [72]         → fe-auth
+        └ ChartSettingsProvider [79]  → fe-charting (above LocationProvider on purpose:
+          └ LocationProvider [80]        clinic-scoped, fetched once per session)
+            └ SidebarProvider [81]    → fe-platform
+              └ PatientsProvider [82]     seeded from src/data/patients — MOCK
+                └ ProvidersProvider [83]
+                  └ ServicesProvider [84]
+                    └ RoomsProvider [85]
+                      └ SchedulingProvider [86]  → fe-scheduling (69 KB)
+                        ├ AppShell [87]
+                        └ RouteSlipHost [88]
 ```
 
 Ten context providers. The README's "9 nested providers" predates `ChartSettingsProvider`.
@@ -201,6 +228,12 @@ Ten context providers. The README's "9 nested providers" predates `ChartSettings
 | `SimpleLoader.jsx` | 736 B | `({ label='Loading...', className, minHeightClassName='min-h-[320px]' })` — 11 call sites, the panel-level loader |
 | `CopyButton.jsx` | 1.4 KB | `({ value, label='Copy chart number', className })` — **transitively dead**, only importer is `pages/PatientDetail.legacy.jsx` |
 | `Breadcrumbs.jsx` | 1.4 KB | `({ items, className })` — **dead** |
+| `UnderlineTabs.jsx` | 3.7 KB | `({ tabs, value, onChange, counts, layoutId, 'aria-label'='Filters', className, nowrap=false, disabled=false })` — `LayoutGroup` underline; 11 importers, the most-used primitive here |
+| `RichSearchableSelect.jsx` | 14 KB | `({ id, value='', onChange, options=[], loading=false, disabled=false, ariaLabel, placeholder='Select…', searchPlaceholder='Search…', emptyLabel='No results', loadingLabel='Loading…', menuContainerRef })` — two-line options, portalled menu |
+| `ListPaginationBar.jsx` | 14 KB | `({ totalItems, totalCount, page, pageSize, onPageChange, onPageSizeChange, pageSizeOptions, itemName='result', itemNamePlural, loading=false, className, showPageSize=true })`. Default export only (`:220`); it IMPORTS `getPaginationRange` and `getPageNumbers` from `src/utils/pagination.js` (`:6-7`) |
+| `PatientSearchField.jsx` | 6.3 KB | `({ selected, onSelect, onClear, disabled=false, error=false, inputRef=null, placeholder })` — wraps `usePatientQuickSearch` (limit 8) |
+| `SegmentedTabList.jsx` | 1.8 KB | `({ 'aria-label', value, onChange, tabs, className })` — pill segmented control; `tab.count` / `tab.hideCount` |
+| `QuietBadge.jsx` | 1.4 KB | no default export — named only: `QuietBadge({ tone='gray', children, className })` `:22`, `TypeBadge` `:30`, `FormStatusBadge({ status, label })` `:34`, `humanizeLabel(raw, fallback='—')` `:40` |
 
 `OVERLAY_Z_INDEX` (`OverlayBackdrop.jsx:8-17`):
 `sidebarBackdrop 40 · sidebarDrawer 50 · drawerBackdrop 40 · drawerPanel 50 ·
@@ -217,7 +250,7 @@ Only these six values have static classes (`:20-27`); any other number silently 
   `:85` (incl. `--sidebar*`), typography `:98` (`--font-sans` Inter), radii `:102`, layout `:108`
   (`--sidebar-width: 15rem`, `--sidebar-width-icon: 54.4px`, `--sidebar-drawer-width`), scrollbars
   `:113`, shadows `:119`.
-- `src/index.css` (946 lines) — `@import 'tailwindcss'` `:1`, `@import './theme/theme.css'` `:2`,
+- `src/index.css` (953 lines) — `@import 'tailwindcss'` `:1`, `@import './theme/theme.css'` `:2`,
   `@theme inline { … }` `:9-90` bridging every var to a Tailwind utility. `blue-*` is remapped onto
   the brand scale so legacy utilities theme too. `--breakpoint-sidebar: 67.5rem` `:89` is what makes
   the `sidebar:` variant work (`AppHeader.jsx:12` `sidebar:hidden`).
@@ -227,10 +260,10 @@ Only these six values have static classes (`:20-27`); any other number silently 
 - `src/theme/index.js` — one-line barrel re-exporting `tokens`. **Dead**, zero importers.
 - `.dark { … }` at `theme.css:126-171` is complete but **nothing ever sets `class="dark"`** — dark
   mode is aspirational.
-- Other named blocks in `index.css`: `.app-scroll` `:402` (the scroll container in `AppLayout`),
-  `.ledger-estimate-fill` `:137`, reduced-motion `:587`, `.app-loader*` `:621-658` (paired with the
-  **commented-out** `#app-loader` div in `index.html:17-22`), two `@media print` blocks `:664`,
-  `:709`.
+- Other named blocks in `index.css`: `.app-scroll` `:409` (the scroll container in `AppLayout`),
+  `.ledger-estimate-fill` `:144`, reduced-motion `:594`, `.app-loader*` `:628-664` (paired with the
+  **commented-out** `#app-loader` div in `index.html:17-22`), two `@media print` blocks `:671`,
+  `:716`.
 
 ---
 
@@ -238,10 +271,10 @@ Only these six values have static classes (`:20-27`); any other number silently 
 
 | Path | Exports |
 |---|---|
-| `src/utils/getErrorMessage.js` (150) | `getErrorMessage(error, fallback)` `:125`, `getAppointmentConflictDetails(error)` `:62` |
-| `src/utils/formatName.js` (138) | `toTitleCaseWord` `toTitleCaseName` `formatNameParts` `formatName` `getNameInitials` `formatSearchPatientName` — 20 importers |
+| `src/utils/getErrorMessage.js` (192) | `getErrorMessage(error, fallback)` `:145`, `getAppointmentConflictDetails(error)` `:82` |
+| `src/utils/formatName.js` (138) | `toTitleCaseWord` `toTitleCaseName` `formatNameParts` `formatName` `getNameInitials` `formatSearchPatientName` — 24 importers |
 | `src/utils/formatCurrency.js` (32) | `formatCurrency(amount)` `:1`, `formatLedgerMoney(value, { withSymbol, blankOnEmpty })` `:22` |
-| `src/utils/locationUtils.js` (225) | `readStoredLocation` `writeStoredLocation` `clearStoredLocation` `getLocationUserMeta` `canFetchLocations` `formatLocationDisplayName` `isExcludedLocation` `sanitizeLocations` `formatLocationRecord` `formatLocationsList` `filterLocationsForPath` `getMockLocations` — 31 importers |
+| `src/utils/locationUtils.js` (225) | `readStoredLocation` `writeStoredLocation` `clearStoredLocation` `getLocationUserMeta` `canFetchLocations` `formatLocationDisplayName` `isExcludedLocation` `sanitizeLocations` `formatLocationRecord` `formatLocationsList` `filterLocationsForPath` `getMockLocations` — 32 importers |
 | `src/utils/routePrefetch.js` (26) | `importRevenueReports` `onIdle` `prefetchRevenueReports` |
 | `src/utils/searchDrawerStore.js` (37) | `searchDrawerStore` — a `useSyncExternalStore` store, deliberately outside React context so opening the drawer does not re-render the calendar |
 | `src/utils/devHmrRecovery.js` (56) | `installDevHmrRecovery()` — DEV-only; reloads on `vite:preloadError` and when `#root` stays empty for 1.2 s, throttled to once per 2.5 s via `sessionStorage['pd-hmr-reload-at']`. Called once from `main.jsx:7` |
@@ -259,7 +292,7 @@ Only these six values have static classes (`:20-27`); any other number silently 
 Zero importers anywhere under `src/`:
 
 - `src/components/Dashboard.jsx` (9 lines, renders "This is dashboard") — `/` renders
-  `PatientCharts`; the `<Dashboard />` call is commented out at `AppRoutes.jsx:176`
+  `PatientCharts`; the `<Dashboard />` call is commented out at `AppRoutes.jsx:184`
 - `src/components/ui/Breadcrumbs.jsx`
 - `src/constants/usStates.js`
 - `src/theme/index.js` (barrel)
@@ -267,7 +300,7 @@ Zero importers anywhere under `src/`:
   of `src/components/ui/CopyButton.jsx`, so that primitive is dead too
 - `src/components/layout/RecentPatientsList.jsx` — file is live code but its only mount is
   **commented out** at `Sidebar.jsx:264`, so the sidebar's recent-patients strip never paints.
-  `src/hooks/useRecentPatients.js` is **not** dead: `pages/PatientDetail.jsx:40,408` imports it and
+  `src/hooks/useRecentPatients.js` is **not** dead: `pages/PatientDetail.jsx:40,415` imports it and
   calls `trackPatient`, so the `practice-dental-recent-patients` localStorage key is still written —
   it just has no reader in the shell. Do not delete the hook with the component.
 
@@ -308,7 +341,7 @@ rules and no Node globals), ignores `dist`. `react-hooks/set-state-in-effect` is
 
 `index.html` (26 lines): title "Practice Dental", `theme-color` `#142866`, a **Google Fonts
 stylesheet link** `:10-13` (an external network dependency at boot), and the `#app-loader` div
-commented out `:17-22` — which makes `App.jsx:49`'s `getElementById('app-loader')?.remove()` a
+commented out `:17-22` — which makes `App.jsx:59`'s `getElementById('app-loader')?.remove()` a
 permanent no-op.
 
 `package.json`: name `practice-dental`, scripts `dev build lint preview`. No `engines` field, so

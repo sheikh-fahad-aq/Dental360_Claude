@@ -26,6 +26,9 @@
 360_Flask_Appointment/app/charting_routes.py	be-charting
 360_Flask_Appointment/app/chart_settings_routes.py	be-charting
 360_Flask_Appointment/app/chart_session_scheduler.py	be-charting
+# be-treatment-plans owns its own suite; must sit above the `tests/*` catch-all
+# below, which would otherwise route every backend test file to be-charting.
+360_Flask_Appointment/tests/test_treatment_plans.py	be-treatment-plans
 360_Flask_Appointment/tests/*	be-charting
 
 360_Flask_Appointment/app/lab_cases_v2_routes.py	be-lab-cases
@@ -33,7 +36,6 @@
 360_Flask_Appointment/app/waitlist_v2_routes.py	be-recare-waitlist
 
 360_Flask_Appointment/app/treatment_plans_v2_routes.py	be-treatment-plans
-360_Flask_Appointment/tests/test_treatment_plans.py	be-treatment-plans
 360_Flask_Appointment/app/dashboard_routes.py	be-dashboard
 
 360_Flask_Appointment/app/models.py	be-data-model

@@ -23,7 +23,9 @@ cd 360_Flask_Appointment && python run.py
 cd PMS_React && npm run dev
 ```
 
-Backend on :5001 (single process — see §4.4), frontend on :5173.
+Backend on **:5002** (`APPOINTMENT_DEV_PORT` overrides it), frontend on :5173.
+Not 5001: PreAuth_Flask sits there and both must run at once, because its ledger reads
+charted procedures from this host over HTTP (`run.py:10-17`). Single process — see §4.4.
 
 Backend tests: `python -m pytest tests/` from `360_Flask_Appointment` — the **only**
 automated test coverage in the workspace. The frontend has none; `npm run lint` is its

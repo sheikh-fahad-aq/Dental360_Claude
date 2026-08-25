@@ -20,12 +20,15 @@ reading source — the file maps and traps there will save you far more context 
         ├─ preAuthApi ───────► pre-auth API        insurance, eligibility, claims,
         │                                          fee schedules, payer portals
         ├─ appointmentApi ───► /__appointment_api/api ─┐
-        └─ chartApi ─────────► /__chart_api/api ───────┴─► 360_Flask_Appointment (:5001)
+        └─ chartApi ─────────► /__chart_api/api ───────┴─► 360_Flask_Appointment (:5002)
                                 (same-origin proxies — those hosts refuse browser CORS)
 ```
 
 Only `360_Flask_Appointment` lives in this workspace. The other two backends are external;
-the SPA is their only consumer here. Full detail: `references/topology.md`.
+the SPA is their only consumer here. The Flask dev port defaults to **5002**, not 5001
+(`APPOINTMENT_DEV_PORT` overrides it): `PreAuth_Flask` binds 5001 and both must be up at
+once, since PreAuth's ledger reads charted procedures from this host over HTTP
+(`360_Flask_Appointment/run.py:17`). Full detail: `references/topology.md`.
 Which frontend module calls which backend blueprint: `references/api-contract-matrix.md`.
 
 ## Skill index
@@ -40,7 +43,7 @@ Which frontend module calls which backend blueprint: `references/api-contract-ma
 | `be-perio` | Periodontal exams — measurement grid, lifecycle, bulk entry |
 | `be-lab-cases` | Lab case lifecycle, vendors, due dates |
 | `be-recare-waitlist` | Recare/recall due tracking and the ASAP waitlist |
-| `be-treatment-plans` | Phase-wise treatment plans: patient accept/decline, signature, share link, and the bridge from accepted work to a booked visit |
+| `be-treatment-plans` | Phase-wise treatment plans: accept/decline/defer, signature, archive, the two-factor (token + DOB) patient link, and the bridge from accepted work to a booked visit |
 | `be-dashboard` | Aggregate statistics and reporting endpoints |
 | `be-data-model` | `models.py` and Alembic migrations — the model index every other skill defers to |
 | `be-platform` | `create_app()` wiring, config, auth decorators, uploads, Docker, CI |
@@ -52,7 +55,7 @@ Which frontend module calls which backend blueprint: `references/api-contract-ma
 | `fe-platform` | App shell, routing, `src/api/client.js` and the four clients, theme, shared UI, build config |
 | `fe-auth` | Login, 2FA, session lifecycle, SSO handoff, browser storage |
 | `fe-scheduling` | The calendar and everything on it — the largest live module |
-| `fe-patient-chart` | The chart shell and its non-clinical sections |
+| `fe-patient-chart` | The chart shell and its non-clinical sections; treatment plans end to end, including the public `/tp/:token` plan page |
 | `fe-charting` | Odontogram, tooth chart, procedure charting, chart session ownership |
 | `fe-perio` | The perio measurement grid UI |
 | `fe-ledger` | The patient financial ledger — one implementation, two surfaces |
@@ -65,12 +68,16 @@ Which frontend module calls which backend blueprint: `references/api-contract-ma
 
 The authoritative file→skill mapping is `.claude/hooks/ownership.tsv`. It is machine-read
 by the hooks and covers every file in both repos; if you are unsure who owns a path,
-that file answers it.
+that file answers it. Coverage by a catch-all is not the same as coverage by a skill —
+`app/patient_documents_routes.py` falls to `be-platform` and no `be-*` skill describes it
+(`references/api-contract-matrix.md`).
 
 ## The change record
 
 `CHANGELOG.md` in this directory is appended by `.claude/hooks/record_change.py` on every
-edit — automatically, at no token cost. Never write to it by hand.
+edit — automatically, at no token cost. Never write to it by hand. It is a **historical**
+log: entries naming files that have since been deleted or renamed are correct as history.
+Do not prune them, and do not treat them as broken-path claims about the current tree.
 
 `.stale.json` tracks which skills now describe code that has changed since the skill was
 last touched. That is a *signal*, not a verdict: most edits do not invalidate a skill.
