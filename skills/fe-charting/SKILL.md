@@ -64,6 +64,8 @@ Paths under `PMS_React/`; `…/` = `src/components/patient-detail/charting/`, `�
 
 | `…/ChartStatusFilters.jsx` · `LayersDropdown.jsx` · `ChartLegend.jsx` · `ChartMaximizeModal.jsx` · `ChartingSubTabs.jsx` | filters/layers/legend/maximize/sub-tab chrome. **`ChartingAssistant.jsx`, `UnlockChartModal.jsx` and `SignNoteDialog.jsx` are DELETED** — the note moved into the Visit panel, and there is no unlock or sign-off step left |
 
+| `…/toothIdentity.js` · `useChartDentition.js` · `DentitionMenu.jsx` | **the dentition layer** — string tooth ids, the three arch layouts (adult 1-32 · primary A-T · mixed 1,2,3+A-J+14,15,16 over 32,31,30+T-K+19,18,17), `toToothId` / `artworkToothFor` / `toothTypeFor` / `bitingSurfaceFor` / `toothColumnWidth` / `splitAtMidline`; the hook that resolves practice default + patient DOB + stored override; the chart's ⋯ menu, mounted as a FIXED child of `ChartStatusFilters` so it exists in the panel and the maximised modal from one mount |
+| `src/assets/odontogram/teeth/tooth-{A..T}-{buccal,lingual}.svg` · `scripts/generate-primary-teeth.mjs` | the 40 primary SVGs and the script that generates them by warping the permanent artwork (shorter crown, constricted cervix, flared molar roots). `node scripts/generate-primary-teeth.mjs --check` fails if a committed file was hand-edited. `CROWN_K` there and `PRIMARY_CROWN_SPAN` in `chartFindingGraphics.js` **must agree** |
 | `…/chartOwnership.js` · `chartingConstants.js` · `chartingCatalog.js` · `chartProcedureMappers.js` · `chartVisuals.js` · `chartFindingGraphics.js` (64 KB) · `chartingNoteTemplates.js` · `chartingMultiCodes.js` | sessionStorage `chart_owned_session_<patientId>` accessors (the ownership rule); constants, catalogs, mappers, SVG geometry, bundles — inventory in references §5 |
 
 | `…/useChartingConditionCatalog.js` · `useChartingProcedureCatalog.js` · `useClinicChartSettings.js` | live pick-lists + practice defaults, each dual-mode |
@@ -258,7 +260,28 @@ in `src/config/patientSections.js:24`. Calls `src/api/charting.js` (22 exported 
 
     (`ChartMaximizeModal.jsx:36`, `visit/SelectVisitModal.jsx`), never `z-[n]`; feedback is `useToast()`, never `alert`.
 
-26. **Tooth numbers are integers 1-32**; primary/mixed is unsupported and fails loudly (Traps). ISO `YYYY-MM-DD` on the wire.
+26. **A TOOTH ID IS AN UPPERCASE STRING** — `"1"`-`"32"` permanent, `"A"`-`"T"` primary, `null` for a row not on a
+    tooth. It was a JS number until primary dentition landed, and the single `Number(raw.toothNumber)` in the wire
+    normalizer was why every primary row was silently dropped on read. Normalize with `toToothId` at ENTRY POINTS
+    ONLY (the wire normalizer, `selectTooth`, `patchTooth`, `ensureTooth`, `editProcedure`) — a second normalization
+    site is how the optimistic write and the refetch rebuild come to key one tooth two ways. ISO `YYYY-MM-DD` on the wire.
+
+27. **`toothIdentity.js` is the dentition layer; `chartingConstants.js` stays PERMANENT-ONLY.** The odontogram asks
+    `getArches(dentition.rendered)` for whichever of the three layouts is in force. `UPPER_TEETH` / `LOWER_TEETH` and
+    the quadrant helpers keep answering for integers 1-32 **because perio slices those arrays by index** and has a
+    `tooth_number BETWEEN 1 AND 32` CHECK behind it — the aliases `PERMANENT_UPPER_TEETH` / `PERMANENT_LOWER_TEETH`
+    exist so each perio import states that requirement. Nothing under `charting/perio/` may import `toothIdentity.js`.
+
+28. **CLINICAL id ≠ ARTWORK analog.** The clinical id is the chart key, the wire value, the label and the SVG
+    filename (primary teeth have their own files). `artworkToothFor(id)` maps a letter to the permanent tooth of the
+    same type in the same quadrant, and exists ONLY for the integer-keyed geometry tables in `chartFindingGraphics.js`
+    (furcation, crown span, root orientation) — do not give those tables letter entries.
+
+29. **The dentition is resolved ONCE, in `ToothChartContext`**, and its arches are handed to the odontogram, the
+    number strip and the maximised chart. `editProcedure` validates a move against that same answer, so a tooth on
+    screen is always a tooth a write may land on. Resolving it twice lets layout and validation disagree while the
+    settings request or the patient's override is still in flight. Precedence: the patient's stored dentition beats
+    the practice setting beats the age rule (`resolveDentition`).
 
 
 
@@ -395,10 +418,9 @@ in `src/config/patientSections.js:24`. Calls `src/api/charting.js` (22 exported 
 
   placeholder — a tab, not a feature.
 
-- **`primary` / `mixed` dentition is unsupported on purpose** — no artwork, integer 1-32 numbering. `resolveDentition()` always
-
-  returns `rendered: 'adult'`; `Odontogram.jsx:323` renders the banner. Detail in references §6.
-
+- **PRIMARY AND MIXED NOW RENDER.** The banner (`DentitionUnsupportedBanner`, `data-testid="dentition-unsupported-banner"`)
+  and the one-per-value dev warning survive as the gate the NEXT numbering scheme has to pass, and nothing shipped
+  triggers them. Details in references §6.
 - Editing anything under `src/context/` forces a **full page reload** (`fullReloadOnContextHmr()` in `vite.config.js`) — a
 
   `ChartSettingsContext.jsx` tweak drops all in-memory chart state.

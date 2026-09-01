@@ -123,3 +123,25 @@ ever names a table.
   `be-charting`, `be-perio`, `be-dashboard` — the blueprints that own the queries.
 - `references/model-index.md` — all 38 models with purposes, the full revision chain, and
   the blueprint→model map.
+
+## Per-patient tooth chart dentition
+
+`patient_chart_dentition` (`app/models.py`, migration `78ab66d417c9_per_patient_tooth_chart_dentition`,
+down_revision `20260827_chart_completed_date`) — one row per `(clinic_id, patient_id)` holding
+`adult` | `primary` | `mixed`, CHECK-constrained, plus `updated_by`.
+
+**A MISSING ROW IS THE NORMAL CASE** and means "no override, use the practice default"
+(`chart_settings.default_dentition`, which may itself be `age-based`). Clearing an override
+DELETES the row rather than writing a sentinel, so "no answer" has exactly one representation —
+which is also why `age-based` is not a member of the CHECK.
+
+Its own table rather than a column on `charts`, because `charts` is **not** a per-patient header:
+`create_chart_session` writes a NEW `Chart` row per session, keyed by provider and visit type, so
+a column there would record one clinician's answer for one visit. Same clinic-scoping caveat as
+`chart_settings` — `CLINIC_ID` is hardcoded to 1 until real tenancy lands.
+
+Note `chart_procedures.tooth_number` and `treatment_plan_items.tooth_number` are both
+`String(20)` with no CHECK, which is why primary teeth (`"A"`-`"T"`) store with no schema change.
+`chart_perio_measurements.tooth_number` is the exception: `SmallInteger` with
+`ck_chart_perio_measurements_tooth_number` (1-32), so **perio is permanent-only at the database
+level** and widening it is a migration, not a frontend change.

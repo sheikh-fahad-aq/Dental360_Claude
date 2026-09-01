@@ -18,7 +18,7 @@ opened, never opening or closing one itself. Maturity **live** (`PMS_React/READM
 | `360_Flask_Appointment/app/charting_routes.py` | **(entry)** blueprint `charting_routes`; 17 routes, validators, serializers, audit log. ~65KB / 1879 lines — `grep -nE "@charting_routes.route"` then `sed -n`, never read whole. Constants `:26`-`:61` are the authoritative enums. |
 | `360_Flask_Appointment/app/chart_settings_routes.py` | blueprint `chart_settings_routes`; GET/PUT `/v2/chart-settings`. 241 lines, read whole — its comments are the tenancy record. |
 | `360_Flask_Appointment/app/chart_session_scheduler.py` | 139 lines. Flask-APScheduler job `chart_session_auto_draft`. Wiring for all three lives in `be-platform`'s `__init__.py` at `:52,72` · `:53,73` · `:82` (`init_scheduler(app)`) — the easy thing to forget. |
-| `360_Flask_Appointment/tests/` | `test_charting_sessions.py` (1117), `test_chart_procedures.py` (736), `test_chart_session_notes.py` (311), `test_conditions_catalog.py` (231), `test_chart_session_scheduler.py` (151), `test_charting_rules.py` (88) — these six only. `ownership.tsv:32` is a `tests/*` catch-all, so unrelated test files (e.g. `test_patient_documents.py`) route here without belonging to this slice; perio and treatment-plan suites are carved out above it. |
+| `360_Flask_Appointment/tests/` | `test_charting_sessions.py` (1117), `test_chart_procedures.py` (736), `test_patient_dentition.py` (12 tests), `test_chart_session_notes.py` (311), `test_conditions_catalog.py` (231), `test_chart_session_scheduler.py` (151), `test_charting_rules.py` (88) — these six only. `ownership.tsv:32` is a `tests/*` catch-all, so unrelated test files (e.g. `test_patient_documents.py`) route here without belonging to this slice; perio and treatment-plan suites are carved out above it. |
 
 Touches, not owned: `app/models.py:557-887` (the eight `Chart*` models, `Chart` through
 `ChartSetting`; `ChartPerioExam:890` on is `be-perio`) and the revisions that create them — both
@@ -50,6 +50,14 @@ Bearer validated by a live HTTP call to Auth — and mount at `/api`. Under `/ap
 - `GET /chartprocedure` `:836` non-deleted entries for a patient · `/conditions` `:876`
   paginated catalog (`limit` ≤ 100) · `/chart-templates` `:902` all templates, and
   `POST /chart-templates` `:909`, which overwrites a **global** template body
+- `GET`/`PUT /patient-dentition` which tooth set THIS patient's chart is drawn in — `adult` |
+  `primary` | `mixed`, or **`null` for no override**, which is an answer and never a 404. A PUT of
+  `null` DELETES the row, so "follow the practice default" has one representation rather than
+  competing with a sentinel; `age-based` is refused 400 (it is a rule for choosing, and a row here
+  exists because somebody already chose). Not session-gated, for the same reason
+  `/chartprocedure/details` is not — it has to be settable before charting starts — and it pays
+  the same price: the row records `updated_by`. It cannot use `_add_audit_log`, whose
+  chart_id/session_id/provider_id are all NOT NULL and describe a session that may not exist.
 - `chart_settings_routes.py`: `GET /api/v2/chart-settings` `:176` (the clinic row, or shipped
   defaults at 200) · `PUT` `:182` **full replace**, 422 unknown key, 400 partial body
 
@@ -74,13 +82,18 @@ three together). Rendered by `PMS_React/src/components/patient-detail/charting/*
 4. One open (`active`|`draft`) clinical session per `(location_id, patient_id, provider_id,
    visit_type)` — `_open_session:305` **and** the partial index
    `uq_chart_sessions_open_clinical_owner_visit` (`20260728…:111`). Change both or neither.
-5. Never hard-delete a chart procedure: set `deleted_at`, bump `version`, and only when
+5. **`tooth_number` is TEXT and is never parsed.** `String(20)`, validated by `_optional_text`
+   only, no CHECK and no bound — which is why primary teeth (`"A"`-`"T"`) needed no backend
+   change at all. It is part of the POST upsert key (session + type + code + tooth +
+   conditionType), so **do not `.upper()` it server-side**: that would change the identity of
+   every already-stored value. The client normalizes at both edges instead.
+6. Never hard-delete a chart procedure: set `deleted_at`, bump `version`, and only when
    `type == "TP" and status == "P"`. `type` (`TP`/`Cn`/`EC`/`EO`) and `status` (`P`/`R`/`C`/`D`)
    are different axes — never map one onto the other.
-6. Responses are `{"result","status","error"}` with HTTP code == `status`, timestamps are
+7. Responses are `{"result","status","error"}` with HTTP code == `status`, timestamps are
    `{"_seconds","_nanoseconds"}`, and `chart_id` on `ChartProcedure`/`ChartAuditLog` is the
    zero-padded string from `_chart_code:268`, not `Chart.id`. The frontend parses exactly this.
-7. `charting_routes.CLINIC_ID:26` and `chart_settings_routes.CLINIC_ID:26` are both `1`; they
+8. `charting_routes.CLINIC_ID:26` and `chart_settings_routes.CLINIC_ID:26` are both `1`; they
    move together when real tenancy lands.
 
 ## Working here

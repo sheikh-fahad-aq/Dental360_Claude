@@ -88,6 +88,18 @@ fee-schedule / payer panels (`preAuthApi`, `VITE_APP_BASE_URL_PRE_AUTH`). `/__ap
 
 ## Traps
 
+- **Tooth Chart Defaults → Default Dentition is a DEFAULT, not the answer.** All four options
+  (`age-based` · `adult` · `primary` · `mixed`) now render — `SUPPORTED_DENTITIONS` in
+  `toothChartDefaultsConstants.js` holds all of them since the A-T artwork landed. A clinician can
+  override it for one patient from the chart's own ⋯ menu, and that choice is stored against the
+  patient (`/v2/charts/patient-dentition`) and outranks this screen. `age-based` resolves from the
+  patient's date of birth, and holds at adult when none is recorded.
+- `UNSUPPORTED_DENTITION_NOTE` and the odontogram's red banner still exist and nothing shipped
+  triggers them: they are the gate the next numbering scheme (FDI, supernumeraries) passes before
+  it can be offered here, because a setting that is silently ignored is indistinguishable from one
+  that works.
+
+
 - **`PMS_React/README.md:353-354` is stale on the counts.** It says "32 registered sections; 12 render a
   real panel"; the tree says **23 registered, 14 wired, 9 placeholder** — `multi-codes` and
   `tooth-chart-defaults` were wired after that paragraph. It also says four groups are commented out when

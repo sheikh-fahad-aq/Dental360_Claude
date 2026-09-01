@@ -96,6 +96,23 @@ Renders no route of its own — it is a panel inside the chart route (`fe-patien
 
 ## Traps
 
+- **PERIO IS PERMANENT-ONLY, AND THE ODONTOGRAM IS NOT ANY MORE.** The tooth chart draws three
+  dentitions (adult 1-32, primary A-T, mixed) and its tooth ids are opaque STRINGS; perio's are
+  integers 1-32 and must stay that way. `chart_perio_measurements.tooth_number` is a
+  `SmallInteger` with a DB CHECK of 1-32, `perioGridModel.js` slices the arch arrays by index to
+  mean "the patient's right half", and the midline-mirror rule is the predicate `n >= 9 && n <= 24`.
+  A letter reaching any of it fails **silently**: reading keys become `"NaN:MB"` and collide,
+  `perioPassIdFor` returns null so every site cell is disabled, and the save throws before the
+  first request — a blank read-only perio chart with no error anywhere.
+  - Perio imports `PERMANENT_UPPER_TEETH` / `PERMANENT_LOWER_TEETH` from `../chartingConstants`,
+    aliased at each import site so the requirement is legible there. Those arrays and
+    `getQuadrantPosition` / `getToothType` / `getToothButtonWidth` keep their exact 1-32 answers.
+  - **Nothing under `charting/perio/` may import `charting/toothIdentity.js` or
+    `useChartDentition.js`**, and no tooth-shaped value crosses the `ChartingContext` →
+    `PerioChartPanel` boundary. Do not add a "jump from the odontogram to perio for this tooth"
+    affordance without doing the migration first.
+
+
 - **Stale docblock.** `perioExamDefaultsConstants.js:10` says the Start Perio Exam dialog "DOES NOT
   EXIST YET" — `NewPerioExamDialog.jsx` is that dialog and is wired. Its validators
   `isValidPerioNavigation` (:920) / `isValidPerioExamOptions` (:946) genuinely have no callers.

@@ -103,6 +103,14 @@ current diff has put at risk.
   repo is stale and misleading — ignore it.
 - **`README_V2_APPOINTMENTS.md`** is the backend's endpoint reference. Cite it; do not
   duplicate it into a skill.
+- **A "tooth" means two different things across this workspace, and they must not converge.**
+  The ODONTOGRAM's tooth id is an opaque uppercase STRING — `"1"`-`"32"` permanent, `"A"`-`"T"`
+  primary — and it draws three dentitions chosen per patient (`fe-charting` · `be-charting`).
+  PERIO's tooth number is an INTEGER 1-32 with a database CHECK behind it (`fe-perio` · `be-perio`
+  · `be-data-model`), and its grid slices arch arrays by index. They share
+  `charting/chartingConstants.js`, which is why that module stays permanent-only while
+  `charting/toothIdentity.js` carries everything dentition-aware. A letter reaching perio fails
+  silently — no throw, no toast, just a blank read-only chart.
 - The appointment/chart proxy is declared in **three** blocks across two files:
   `server.proxy` and `preview.proxy` in `vite.config.js`, and `rewrites` in `vercel.json`.
   Changing one alone breaks dev, or `npm run preview`, or production — never all three at

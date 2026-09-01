@@ -26,6 +26,7 @@ Read those before changing a payload. This file is the index into them.
 | `deleteChartProcedure` (939) | `DELETE /v2/charts/chartprocedure` (body `{sessionId, objectId}`) |
 | `updateChartProcedureStatus` (984) | `POST /v2/charts/chartprocedure/status` |
 | `updateChartProcedureDetails` (1035) | `POST /v2/charts/chartprocedure/details` — fee/provider/date/comments, partial by KEY PRESENCE; the ONLY chart-procedure write with **no active-session gate**, and it rejects `cdtCode`/`type`/`toothNumber`/ids/`status` with 400 |
+| `fetchPatientDentition` / `savePatientDentition` | `GET`/`PUT /v2/charts/patient-dentition` — the per-patient tooth set. `dentition: null` is "no override", not an error; PUTting null CLEARS it (the server deletes the row). The READ never throws — a failure reads as no override, which falls back to the practice default; the WRITE does, because a clinician pressed a button |
 | `fetchChartTemplates` (826) | `GET  /v2/charts/chart-templates` |
 | `fetchChartSessionTemplates` (864) | `GET  /v2/charts/chart-session/templates` (plural — different path) |
 | `applyChartSessionTemplate` (886) | `POST /v2/charts/chart-session/template` (singular) |
@@ -138,12 +139,33 @@ rather than blocking the page. Guarded by a `cancelled` flag, not a request-id r
 
 ## 6. Dentition
 
-`useClinicChartSettings.js:136-175`. `resolveDentition()` always returns `rendered: 'adult'`.
-`primary` and `mixed` are deliberately unsupported — no A-T/51-85 artwork, integer 1-32
-numbering everywhere, and 1-32 bounds in `ToothChartContext` / `EditProcedureModal`. The failure
-is loud on purpose: `useChartDentition()` logs one dev warning per setting and `Odontogram.jsx:323`
-renders `DentitionUnsupportedBanner` (`data-testid="dentition-unsupported-banner"`). Do not
-"fix" this by silently rendering adult teeth for a child.
+Three tooth sets render. `resolveDentition(defaultDentition, { dobISO, override })` in
+`useClinicChartSettings.js` is the only place the question is answered; `useChartDentition.js`
+is the hook that feeds it (its own file so `useClinicChartSettings` and `ChartingContext` do not
+import each other — ChartingContext already imports the former for the default provider).
+
+| Set | Upper, screen left → right | Lower, screen left → right |
+|---|---|---|
+| `adult` | 1 … 16 | 32 … 17 |
+| `primary` | A … J | T … K |
+| `mixed` | 1,2,3, A … J, 14,15,16 | 32,31,30, T … K, 19,18,17 |
+
+Precedence: the patient's stored dentition (`/v2/charts/patient-dentition`) → the practice
+setting when it names a set outright → the age rule. The age rule is under 6 primary, 6-12
+mixed, 13+ adult, from `ChartingProvider`'s `patientDob` (ISO; `patient.dob` is a locale string
+and `patient.age` is 0 for an unrecorded date, so `patientMappers.js` gained `dobISO`). **No date
+of birth holds at adult** — the placeholder patient paints for the first frames of every
+navigation and reports `age: 0`.
+
+`supported` and the `DentitionUnsupportedBanner` survive with nothing shipped triggering them:
+they are the gate a future numbering scheme (FDI, supernumeraries, retained deciduous) passes
+through before it can be offered in Settings.
+
+**Perio is untouched and must stay that way.** `chart_perio_measurements.tooth_number` is a
+`SmallInteger` with a DB CHECK of 1-32, `perioGridModel.js` slices `PERMANENT_UPPER_TEETH` by
+index to mean "the patient's right half", and the midline-mirror predicate is `n >= 9 && n <= 24`.
+A letter reaching any of it produces reading keys like `"NaN:MB"`, a grid whose every cell is
+disabled, and a save that throws before it sends — with no error surfaced anywhere.
 
 ## 7. The treatment listing's three reads
 
