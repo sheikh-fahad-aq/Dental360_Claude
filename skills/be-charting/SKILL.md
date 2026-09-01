@@ -37,6 +37,12 @@ Bearer validated by a live HTTP call to Auth — and mount at `/api`. Under `/ap
   active session · `/templates` `:1103` this session's notes
 - `POST /chartprocedure` `:522` add one entry, **upsert/merge not insert** · `DELETE` `:674`
   soft-delete, planned `TP` only · `POST /chartprocedure/status` `:761` `P`/`R`/`C`/`D`
+  · that status route also accepts the FACTS OF COMPLETION in the same request
+  (`ucrFeeCents`, `providerId`, `providerName`, `completedDate`), because marking a
+  procedure done is one clinical act — a details PATCH followed by a status POST writes
+  two audit rows for one event and leaves the row completed-but-unpriced in between.
+  `completed_date` is a SEPARATE column from `chart_date`: planned and performed are two
+  facts, and the route clears `completed_date` on any status other than `C`.
 - `POST /chartprocedure/details` `:1745` edit the **administrative** fields only —
   `ucrFeeCents`, `providerId`+`providerName`, `chartDate`, `comments`, each applied only if its
   key is present; 400 on any identity field (`CHART_PROCEDURE_IDENTITY_FIELDS:1676`, camel and

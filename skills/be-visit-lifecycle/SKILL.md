@@ -97,6 +97,12 @@ status board. Per-surface line map: `references/state-machine.md` §7.
 
 ## Traps
 
+- **`check_out_step = "post_op_receipt"` is a DONE-marker, not a step.** `/check-out/complete`
+  writes it; `/check-out/start` must NOT carry it forward. It now re-seeds `visit_summary` unless
+  the visit was already `in_progress`, because resuming only ever means resuming something still
+  running — carrying the marker forward re-opened the wizard on its LAST screen (the client's
+  `normalizeCheckOutStep` mapped it to `schedule`), two steps past the charges the operator had
+  come back to review. The client half is in `fe-scheduling`.
 - **Tracker seeding is off.** `DEFAULT_TRACKER_STATUSES = []` (tracking :146) and the seed route
   returns 400 unconditionally (:360). With no `appointment_tracking_status` rows for the clinic,
   `POST /check-in/complete` and `POST /check-out/start` raise inside

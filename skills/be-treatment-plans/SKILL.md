@@ -37,6 +37,7 @@ POST /v2/treatment-plans  create; phases+items optional inline                  
 GET|PUT|DELETE /v2/treatment-plans/<planId>  read | edit/void | delete draft
                                                                 :1185 :1195 :1268
 POST .../archive | .../unarchive  leave the listing | come back        :1299 :1345
+POST .../reopen                   new version: unsign, clear answers
 POST .../phases   PUT | DELETE .../phases/<phaseId>      :1411   :1439 :1490
 POST .../items    PUT | DELETE .../items/<itemId>        :1613   :1677 :1763
 POST .../present (idempotent, never 409s) | .../decisions (chairside) :1940 :1991
@@ -59,32 +60,69 @@ GET  .../events | .../revisions | .../revisions/<revisionId>  :3146 :3196 :3229
 2. **`scheduled` is DERIVED, never set by a caller.** `_recalculate_plan_status` (`:951`,
    block `:1004`) sets it when every accepted item is booked and nothing awaits a decision.
    A LABEL only; `schedule_treatment_plan_phase` and `unschedule_treatment_plan_item` call it.
-3. **The patient's RESPONSE is the freeze, not the presentation.** `EDITABLE_PLAN_STATUSES =
-   {"draft","presented"}` (`:93`), `DELETABLE_PLAN_STATUSES = {"draft"}` (`:98`);
-   `_content_edit_error` (`:831`) gates the document and `_item_edit_error` (`:863`) one
-   accepted line. Mirrored by `isPlanEditable()`, `PMS_React/src/api/treatmentPlans.js:104`.
-4. **THE PATIENT LINK TAKES TWO FACTORS, and the second is the real one.** `POST
+3. **THE CALENDAR IS THE FREEZE, not the patient's response.** `EDITABLE_PLAN_STATUSES =
+   {"draft","presented","partially_accepted","accepted"}`, `DELETABLE_PLAN_STATUSES =
+   {"draft"}`. A plan the patient accepted but nobody has booked is still being arranged;
+   freezing at "accepted" only forced coordinators to abandon the document and rebuild it,
+   losing the plan the patient agreed to. What cannot move is work the calendar owns, and
+   that is enforced **per line**: `_item_edit_error` refuses `schedule_status !=
+   "unscheduled"`, NOT `acceptance == "accepted"`. It is load-bearing now, not defence in
+   depth — the only thing between an edit and an orphaned `AppointmentProcedure`.
+   `delete_treatment_plan_phase` bypasses it entirely and carries its own booked guard for
+   the same reason. The content routes call `_recalculate_plan_status` so a line added
+   after acceptance drops the plan off "accepted" instead of claiming the patient agreed to
+   it. Mirrored by `isPlanEditable()` / `isPlanItemEditable()` in
+   `PMS_React/src/api/treatmentPlans.js`.
+4. **A SIGNATURE IS STILL AN ABSOLUTE BAR at `_content_edit_error`; `/reopen` is the way
+   through.** It detaches the signature, clears every acceptance and the manual response,
+   then lets `_recalculate_plan_status` land the plan on `presented`. It must **never** set
+   `status="draft"`: that reads as "nobody has ever seen this" and is a trap —
+   `_recalculate_plan_status` returns early on draft, so the plan could never climb back
+   and completing treatment at the chair would leave it reading Draft forever. Nothing is
+   copied and nothing is lost: `_capture_revision` already ran on the signing request, so
+   the signed text is a frozen revision in the version picker — that IS the "previous
+   version". Refuses once anything is booked. Modelled on `reopen_chart_perio_exam`: a
+   distinct transition, never a widened gate. `response_source` / `response_note` are NOT
+   NULL, so clear them to `""`.
+   **Booked lines are SKIPPED, not refused.** Rejecting the whole request whenever anything
+   was on the calendar made a `scheduled` plan permanently unrevisable — book phase 1 and
+   phase 2 could not be touched. A booked line keeps its acceptance (an appointment backs it)
+   and stays protected by `_item_edit_error`; the rest reopen and the roll-up drops off
+   `scheduled` on its own. With NOTHING unbooked it refuses even when a signature could be
+   detached: doing so would strip the attestation and leave the plan equally uneditable — a
+   destructive no-op. **`completed` is refused outright** and the message names Duplicate:
+   every accepted line has been performed, with appointment procedures marked done and
+   charges posted, so clearing the acceptance would say nobody agreed to delivered work.
+   **Refused outright on `scheduled` and `completed`.** `scheduled` is derived and means EVERY
+   accepted line is booked with nothing undecided, so a reopen would find no reopenable line,
+   change no acceptance, leave the status where it was — and destroy the signature on the way
+   past. A strictly destructive no-op. This does NOT conflict with the skip-booked-lines rule:
+   the case that one protects (phase 1 booked, phase 2 open) leaves the plan on `accepted`,
+   because not every accepted line is booked yet, and that plan still reopens. The client
+   mirrors it — `canReopen` tests `!isSettledPlan` BEFORE the signature clause, which is an OR
+   and otherwise let a scheduled-and-signed plan offer a button the server refuses.
+5. **THE PATIENT LINK TAKES TWO FACTORS, and the second is the real one.** `POST
    .../shared/<token>/verify` (`:2367`) proves the reader by date of birth against a per-plan
    salted digest and mints the `X-Plan-Access` credential both public reads check BEFORE any
    status inspection. Never a signed grant (`app/__init__.py:28` commits a literal
    `SECRET_KEY`); `share_failed_attempts` is monotonic; limiting never revokes the link; junk
    input never spends the counter; `_live_patient_dob` (`:283`) fails CLOSED.
-5. **`/send` and `/share` must issue the SAME link.** Both stop the expiry, both call
+6. **`/send` and `/share` must issue the SAME link.** Both stop the expiry, both call
    `_snapshot_share_dob` (`:299`) and 409 when the DOB is unreadable, both
    `_revoke_share_sessions` on rotation. Signing no longer revokes the token.
-6. **Email variables are substituted SERVER-SIDE, and escaped.** `_fill_email_variables`
+7. **Email variables are substituted SERVER-SIDE, and escaped.** `_fill_email_variables`
    (`:2329`) fills `[Form Link]`/`[Practice Name]`/`[Patient First Name]`; the browser cannot
    fill `[Form Link]`, as `/send` rotates the token. All but the URL go through `html.escape`.
-7. **Public routes are allow-listed, not deny-listed** — `_serialize_plan_for_patient()`
+8. **Public routes are allow-listed, not deny-listed** — `_serialize_plan_for_patient()`
    (`:2055`) names every field that may leave. `PUBLIC_ENDPOINTS` at `:184`.
-8. **`NULL` money is not `0`** (no figure vs free): `_totals` (`:636`) returns `NULL` if **any**
+9. **`NULL` money is not `0`** (no figure vs free): `_totals` (`:636`) returns `NULL` if **any**
    line is unpriced. **`teeth` distinguishes `[]` from absent** (`_plan_teeth` `:668`), EMPTY
    meaning full-mouth. Staff-only, as is `origin` (provenance, NOT `response_source`).
-9. **Phase sequences are allocated, never caller-supplied,** and never reused —
+10. **Phase sequences are allocated, never caller-supplied,** and never reused —
    `_next_phase_sequence` (`:1396`) counts soft-deleted rows.
-10. **Only `accepted` + `unscheduled` items are booked**, a completed one cannot be unscheduled,
+11. **Only `accepted` + `unscheduled` items are booked**, a completed one cannot be unscheduled,
    and scheduling **adopts** a matching booking row instead of inserting a duplicate (`:2633`).
-11. **Events and revision snapshots carry no PHI** — no signature bytes, name or email.
+12. **Events and revision snapshots carry no PHI** — no signature bytes, name or email.
    `AppointmentProcedure.completed_at` is naive (`:3084`); all else is `timezone=True`.
 
 ## Working here

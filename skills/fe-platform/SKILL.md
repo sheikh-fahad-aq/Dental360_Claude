@@ -22,7 +22,7 @@ standalone pages. Owned elsewhere, link never edit: `AuthContext.jsx` + `/login*
 | `src/main.jsx` · `src/App.jsx` · `ErrorBoundary.jsx` · `AppLoader.jsx` · `CommandPalette.jsx` | 13 / 106 / 279 / 9 / 183. Root render + `installDevHmrRecovery()`; **ten** context providers (README's "9" is stale) + the `AppShell` standalone-vs-chrome branch `:22-46`; stale-chunk detect and 3 s auto-reload (`:4`,`:36`); boot spinner; ⌘/Ctrl-K patient search (`:35`) |
 | `src/components/AppRoutes.jsx` | 372. EVERY route — all `lazy()`, all in `ProtectedRoute` except `/login*`, `/f/:token` `:175` and `/tp/:token` `:177`. `lazyNamed` `:12`, Suspense fallbacks `:95`/`:129`, route table `:170-367` |
 | `src/components/layout/` | `AppLayout.jsx` (18 — sidebar + header + `.app-scroll`), `Sidebar.jsx` (12.7 KB — `'#'` guard `:82`, outbound SSO `:121`, `RecentPatientsList` commented out `:264`), `AppHeader.jsx` (mobile only), `PracticeSwitcher.jsx` (15 KB), `UserAccountMenu.jsx` (9 KB), `LogoIcon.jsx`, `SidebarTooltip.jsx` |
-| `src/components/ui/` | 18 primitives. `OverlayBackdrop.jsx` carries `OVERLAY_Z_INDEX` `:8`; `SearchableSelect.jsx` is 17 KB — grep it. Prop table in references §5 |
+| `src/components/ui/` | 19 primitives. `OverlayBackdrop.jsx` carries `OVERLAY_Z_INDEX` `:8`; `SearchableSelect.jsx` is 17 KB — grep it. `EmailTemplateEditor.jsx` (227) is the TipTap email-body composer shared by the treatment-plan and appointment-notification send modals — banner, button label and variables are props, so keep it free of any one caller's constants. Prop table in references §5 |
 | `src/lib/queryClient.js` · `src/config/` · `src/context/` (generic only) | 23 / — / —. Query defaults (staleTime 60 s, no refetch-on-focus, retry 1) + `patientKeys`; `routes.js` (`ROUTES` `:2`, `getPageTransitionKey` `:45`, `isNavItemActive` `:71`), `navigation.js` (4 sidebar groups), `loading.js` (`MOCK_LOAD_MS = 0`); `ToastContext.jsx` (`useToast()` `:175`), `SidebarContext.jsx`, `LocationContext.jsx`, `Providers/Services/RoomsContext.jsx`, `PatientsContext.jsx` (**mock seed**) |
 | `src/theme/theme.css` · `src/index.css` · `tokens.js` | 172 / 953 / 50. `:root` tokens `:14`; the `@theme inline` bridge `:9-90` + `--breakpoint-sidebar` `:89`; the hand-synced JS hex mirror |
 | `src/utils/` · `src/hooks/` · `src/constants/` | `getErrorMessage` · `formatName` · `formatCurrency` · `locationUtils` (32 importers) · `routePrefetch` · `searchDrawerStore` · `devHmrRecovery`; `useMediaQuery` · `useModalFocus`; `brand.js` · `phone.js` (E.164) |
@@ -92,6 +92,28 @@ a `normalizeX(raw)`, with an `if (!isXApiEnabled())` mock branch. Never `fetch`.
 `Z_INDEX_CLASS`. Verify by loading the page and watching the request, then `npm run lint` — **no test suite, no CI**.
 
 ## Traps
+
+- **NEVER BUILD A URL FROM A MIXED SOURCE — this repo has been bitten twice.** `BrowserRouter`
+  wraps navigations in `startTransition` and every route in `AppRoutes.jsx` is `lazy()`, so
+  `navigate()` moves `window.location` **synchronously** while `useLocation()` stays on the OLD
+  value for the whole chunk fetch — hundreds of ms, not microseconds. Any effect that writes a URL
+  inside that window and takes its pathname from React but its query from `window.location` (or
+  calls `setSearchParams`, which resolves `"?…"` against the ROUTER's pathname) will
+  `replaceState` the old pathname carrying the new query string, destroying the history entry the
+  outbound navigation just made. The symptom is "the button did nothing".
+  - `pages/PatientDetail.jsx` (the seed-state strip) — fixed: a `seedAppliedRef` latch plus a bail
+    when the live URL no longer matches the rendered one. Both are load-bearing.
+  - `pages/Scheduling.jsx` (`SchedulingQueryParams`' param strip) — fixed the same way. Its
+    `openNewAppointment` dep rotates with the operatory list, i.e. **independently of the
+    location**, which is what let it fire inside the stale window.
+  - Rule: take every half of a URL from the same source, and bail if `window.location` has already
+    moved on.
+- **`AppLoader` must not lift on `requestAnimationFrame` alone** (`src/App.jsx`). A hidden or
+  non-compositing tab never runs one, so the full-screen `fixed inset-0 z-50` overlay stayed up
+  and swallowed every pointer while the app rendered normally underneath — "the button is dead",
+  not "still loading". It now has a timeout floor alongside the frame. The same rAF dependency is
+  why framer-motion exit animations never finish in a background tab, leaving `AnimatePresence`
+  backdrops in the DOM at `opacity: 0` with `pointer-events: auto`.
 
 - **Editing anything under `src/context/` forces a full page reload** — `fullReloadOnContextHmr()`,
   `vite.config.js:11-21`: Fast Refresh cannot patch hook exports, so in-memory state is lost by design.

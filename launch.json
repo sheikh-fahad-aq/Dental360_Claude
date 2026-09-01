@@ -4,7 +4,10 @@
     {
       "name": "pms-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "cwd": "PMS_React",
       "url": "http://localhost:5173",
       "port": 5173
@@ -12,9 +15,27 @@
     {
       "name": "flask-api",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["run.py"],
+      "runtimeArgs": [
+        "run.py"
+      ],
       "cwd": "360_Flask_Appointment",
       "port": 5002
+    },
+    {
+      "name": "pms-mocktest",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--mode",
+        "mocktest",
+        "--port",
+        "5199"
+      ],
+      "cwd": "PMS_React",
+      "url": "http://localhost:5199",
+      "port": 5199
     }
   ]
 }

@@ -35,16 +35,17 @@ Backend — all under `url_prefix='/api'`; `Line` is in `appointments_v2_routes.
 
 | Route | Purpose | Line |
 |---|---|---|
-| `GET /api/v2/appointments/calendar` | Day (`date`) or range (`date_from`/`date_to`) feed: appointments, blocks, providers, operatories, statuses | 206 |
-| `GET /api/v2/appointments/status-filters` | Status filter chips for the calendar header | 636 |
-| `GET /api/v2/appointments` | Patient appointment list, paginated; `patient_id` + `clinic_id` required | 692 |
-| `POST /api/v2/appointments/availability` | Find-open-slots search | 870 |
-| `POST /api/v2/appointments` | Create — 3 patient payload modes (see README) | 1108 |
-| `GET /api/v2/appointments/<id>` | Detail drawer payload | 1303 |
-| `GET /api/v2/appointments/<id>/route-slip` | Printable route slip | 1373 |
-| `PUT /api/v2/appointments/<id>` | Update / reschedule | 1618 |
-| `PATCH /api/v2/appointments/<id>/status` | Lifecycle status change | 1758 |
-| `POST /api/v2/appointments/<id>/cancel` | Cancel | 1806 |
+| `GET /api/v2/appointments/calendar` | Day (`date`) or range (`date_from`/`date_to`) feed: appointments, blocks, providers, operatories, statuses | 208 |
+| `GET /api/v2/appointments/status-filters` | Status filter chips for the calendar header | 638 |
+| `GET /api/v2/appointments` | Patient appointment list, paginated; `patient_id` + `clinic_id` required | 694 |
+| `POST /api/v2/appointments/availability` | Find-open-slots search | 872 |
+| `POST /api/v2/appointments` | Create — 3 patient payload modes (see README) | 1114 |
+| `GET /api/v2/appointments/<id>` | Detail drawer payload | 1309 |
+| `GET /api/v2/appointments/<id>/route-slip` | Printable route slip | 1379 |
+| `PUT /api/v2/appointments/<id>` | Update / reschedule | 1624 |
+| `PATCH /api/v2/appointments/<id>/status` | Lifecycle status change | 1764 |
+| `POST /api/v2/appointments/<id>/cancel` | Cancel | 1812 |
+| `POST /api/v2/appointments/notify` | Email a patient a **proposed** time — takes a slot, not an id | 1913 |
 
 Legacy `/api/appointment/*` — 29 routes, inventory in `references/legacy-and-helpers.md`.
 Frontend (maturity **live**, all files `fe-scheduling`'s): `PMS_React/src/api/appointments.js` is
@@ -59,7 +60,7 @@ the only caller (`const BASE = '/v2/appointments'`, :15) over the same-origin pr
 ## Invariants
 
 1. V2 auth is a blueprint-wide `before_request` gate, not a per-route decorator
-   (`appointments_v2_routes.py:69–76` → `require_api_and_bearer`), so every V2 route needs **both**
+   (`appointments_v2_routes.py:71–78` → `require_api_and_bearer`), so every V2 route needs **both**
    `x-api-key` and a valid `Authorization: Bearer`. Never decorate an individual V2 route; never
    add one expecting it to be public.
 2. Legacy `appointment_routes.py` has **zero** auth decorators (`grep -c '@validate_api_key'` → 0).
@@ -88,7 +89,7 @@ the only caller (`const BASE = '/v2/appointments'`, :15) over the same-origin pr
 2. Add the handler in `appointments_v2_routes.py`; no decorator (invariant 1). A *new* blueprint
    must also be registered in `app/__init__.py` — the easy-to-forget step.
 3. Put reusable logic in `app/util/appointments_helpers.py`, then add it to the explicit import
-   list at `appointments_v2_routes.py:22–61`.
+   list at `appointments_v2_routes.py:24–63`.
 4. Serialize with the existing helpers — `serialize_appointment` (:3330), `slim_patient` (:3392),
    `slim_provider` (:3536), `slim_operatory` (:3562) — so payload shape stays stable.
 5. Document it in `README_V2_APPOINTMENTS.md`, then wire `PMS_React/src/api/appointments.js`.
@@ -108,12 +109,29 @@ the only caller (`const BASE = '/v2/appointments'`, :15) over the same-origin pr
   `no-show` / `complete` live at `appointment_tracking_routes.py:925` and `:963`, not here.
 - `GET /api/available-appointments` (`appointment_routes.py:3740`) returns a **hardcoded mock**
   dict defined at :3732. Not real availability — use `POST /v2/appointments/availability`.
-- Calendar caps at `MAX_CALENDAR_APPOINTMENTS = 2000` (:66) and sets `truncated` (:330); ranges
+- Calendar caps at `MAX_CALENDAR_APPOINTMENTS = 2000` (:68) and sets `truncated` (:332); ranges
   cap at `MAX_AVAILABILITY_DAYS = 31` (`appointments_helpers.py:1659`).
 - Calendar provider/operatory filters union the legacy join tables `AppointmentServiceProvider`
   and `AppointmentLocation` (:272–303) — old rows have no `appointment_provider_id`/`operatory_id`,
   so keep both branches.
-- There are **no tests** for appointments — `360_Flask_Appointment/tests/` covers charting only.
+- **`/notify` is the one route here that neither reads nor writes the database.** It exists for
+  the moment BEFORE a booking: the Add Appointment drawer's confirm step has a slot, not an
+  appointment, and the coordinator wants the patient to see the time first. So it takes
+  `patient_id` + `date` + `time` and no `appointment_id`, and every string it produces says the
+  time is being *held* — the body closes with "not confirmed until our office books it". Never
+  reword that into a confirmation, and never make it depend on an appointment existing: a patient
+  who reads "confirmed" and finds nothing on the schedule is the failure the confirm step exists
+  to prevent. Email only; SMS is refused with a reason (the Auth service's SMS path is
+  form-specific). Delivery is `send_email` from `appointment_routes`, imported **lazily inside the
+  handler** — a module-level import closes an import cycle at start-up. It is the only route in
+  this file that touches `html` / `os`, both imported at :4–5.
+- **`parse_date` / `parse_time` RAISE on a malformed value; they do not return `None`.** A bare
+  `if not parse_date(...)` inside the file-wide `except Exception` answered **500** for what is
+  the caller's typo. Wrap both in `except (TypeError, ValueError)` and return 400 — the
+  availability route at :872 already does, and `/notify` now does too (:1949).
+- Appointment test coverage is **one file**: `tests/test_appointment_notify.py` (11 tests) covers
+  `/v2/appointments/notify` only. Everything else in this slice — calendar, availability, create,
+  update, cancel — still has none.
 
 ## See also
 

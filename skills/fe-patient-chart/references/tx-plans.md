@@ -24,13 +24,13 @@ tree. Paths are relative to `PMS_React/` unless prefixed with a repo name. Serve
 
 | file | lines | role |
 |---|---|---|
-| `TreatmentPlanBuilder.jsx` | 1599 | The full-screen editor. `grep`/`sed -n`, never read whole. `handlePresent` `:887`, `handleSend` `:929`, `handleSendSubmit` `:934`, `handleCopyShareLink` `:964`, the Mark-response gate `:348-350`. |
+| `TreatmentPlanBuilder.jsx` | 1805 | The full-screen editor. `grep`/`sed -n`, never read whole. `handleSchedule` `:703`, `handlePresent` `:1034`, `handleSend` `:1076`, `handleSendSubmit` `:1081`, `handleCopyShareLink` `:1111`, the Mark-response gate `:370-382`. |
 | `TreatmentPlanDocument.jsx` | 548 | The plan rendered as a document (phases, items, totals). |
 | `TreatmentPlanPatientPreview.jsx` | 580 | What the patient sees, including `SignaturePad` `:124`. Mounted without app providers — nothing here may reach for `useToast` or `getClinicId()`. |
 | `TreatmentPlanPresentation.jsx` | 168 | Chairside presentation mode: the clinician turns the screen to the patient. |
-| `SendTreatmentPlanModal.jsx` | 503 | Staff compose modal (channel tabs, To row, template body). Sibling of `forms/SendFormToPatientModal`. |
-| `EmailTemplateEditor.jsx` | 208 | TipTap editor for the email **body only** (see §3.9). |
-| `emailTemplate.js` | 79 | `EMAIL_VARIABLES` `:24`, `SERVER_FILLED_VARIABLES` `:34`, `DEFAULT_SUBJECT` `:36`, `DEFAULT_BODY_HTML` `:39`, `buildTreatmentPlanEmailHtml` `:55`, `isTemplateEdited` `:77`. |
+| `SendTreatmentPlanModal.jsx` | 513 | Staff compose modal (channel tabs, To row, subject, template body). Sibling of `forms/SendFormToPatientModal`. |
+| `SendPredeterminationModal.jsx` | 205 | Addresses a predetermination claim to ONE coverage. |
+| `emailTemplate.js` | 79 | `EMAIL_VARIABLES` `:24`, `SERVER_FILLED_VARIABLES` `:34`, `DEFAULT_SUBJECT` `:36`, `DEFAULT_BODY_HTML` `:39`, `EMAIL_BUTTON_LABEL`/`EMAIL_HEADER_TITLE` `:52-53`, `buildTreatmentPlanEmailHtml` `:55`, `isTemplateEdited` `:77`. This folder's half of the composer; the editor itself is shared. |
 | `TreatmentPlanActionsMenu.jsx` | 189 | The "⋯" overflow menu. The action list starts at `:34`; `requiresSavedPlan` is the only disable reason (`:150-152`). |
 | `ComparePlansModal.jsx` · `comparePlans.js` | 308 · 79 | Compare two plans. The pure matching rule lives in the `.js` so it can be reasoned about alone. |
 | `treatmentPlanPdf.js` | 297 | Client-side jsPDF export. `COL` `:36`, `LABEL_GUTTER` `:39`, `ensureSpace` `:80`, `pdf.save(treatmentPlanPdfFilename(plan))` `:293`. |
@@ -56,6 +56,17 @@ New Plan passes `planId={null}` — an unsaved draft, the same entry point chart
 create-then-open POST. The provider comes from Settings → Tooth Chart Defaults → Default Provider via
 `useClinicChartSettings()` (`:80`); send `provider.apiId`, never `provider.id`, which is a String the
 API rejects. With no default configured it falls back to `NewTreatmentPlanDrawer`, which asks for one.
+
+**Scheduling the work.** The footer's Schedule opens the shared slot finder with a plan seed:
+`findOpenSlotsDrawerStore.open({ planId, planTitle, patient, phases, procedures, acceptedCount,
+onBooked })` (`handleSchedule` `:703`). That seed is also the drawer's MODE SWITCH — it reads
+`Boolean(planSeed?.planId)` and, only then, groups the results into a horizontal weekday strip,
+turns a slot click into a two-step confirm screen instead of an immediate booking, and hides its
+Service selector. `patient` carries `{ id, name, email, phone }` because the confirm step composes
+a "we are holding this time" email to that address; without the contacts the composer opens on an
+empty To row for somebody who has one. In memory on the store only — never persisted, never
+logged. `onBooked` refetches this plan, because booking is the one action that changes it from
+outside the builder. Details in `fe-scheduling`.
 
 **Presenting and sharing.** `handlePresent` (`:887`) marks the plan presented. `handleCopyShareLink`
 (`:964`) mints a share token on click. `handleSend` (`:929`) only opens the modal; the actual
@@ -200,10 +211,17 @@ edge, heads on every item page, 0 orphaned detail lines across 12–30 items.
 
 ### 3.10 The email composer edits a BODY, never the whole email
 
+**`EmailTemplateEditor` lives in `src/components/ui/`, not here.** It moved out when the Add
+Appointment drawer's notify composer needed the same editor with a different banner, no button and
+its own tokens (`fe-scheduling`). Those three are props now — `headerTitle`, `buttonLabel`
+(`null` = no button) and `variables` — and `SendTreatmentPlanModal` passes its own from
+`emailTemplate.js`. Nothing plan-specific is left in the editor; add a second caller's constants as
+props, never as an `if` inside it.
+
 `EmailTemplateEditor` renders the chrome — banner, card, Review button — as fixed React markup and puts
 only the message in TipTap (already a dependency; StarterKit v3 ships `link` and `undoRedo`, so
 Bold / Italic / Link / Undo / Redo need no extra package). Nothing assigns `innerHTML` and nothing
-arbitrary is parsed (`EmailTemplateEditor.jsx:18`), which is the only way to have a WYSIWYG email in a
+arbitrary is parsed (`ui/EmailTemplateEditor.jsx:14`), which is the only way to have a WYSIWYG email in a
 repo with no sanitiser (§7.4). `buildTreatmentPlanEmailHtml` (`emailTemplate.js:55`) composes the
 outgoing string with **inline** styles and no classes — an email client strips stylesheets, which is
 also why the hex values in that file are not a CLAUDE.md §6.4 violation. The template leaves the browser
